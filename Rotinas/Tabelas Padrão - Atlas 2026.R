@@ -53,9 +53,6 @@ here::i_am("Rotinas/Tabelas Padrão - Atlas 2026.R")
 load(paste0(dirname(getwd()),"/bases/sim/RData/sim_doext_14_24.Rdata"))
 year <- c(2014:2024)
 
-rm(list = setdiff(ls(),"sim_doext"))
-
-
 #Contagem de homicídios registrados, por ano e UF
 sim_doext |> 
   #Filtro das intenções de interesse.
@@ -138,10 +135,14 @@ base |> select(ano,def_uf_resd,tx_homic) |>
   mutate(across(where(is.numeric), ~ str_replace_all(as.character(.), "\\.", ","))) %>%
   #Necessário para colocar o título
   #as_tibble() |>
-  adorn_title(placement = "top",col_name = glue::glue("Taxa de Homicídios, por UF {min(year)}–{max(year)}") ) |>
+  #Nota de rodapé
+  add_row(
+  def_uf_resd = "Fonte: IBGE - Pesquisa Nacional por Amostra de Domicílios Contínua (PNADc) e MS/SVS/CGIAE - Sistema de Informações sobre Mortalidade (SIM). Elaboração: Diest/Ipea e FBSP. Nota: O número de homicídios foi obtido pela soma das seguintes CIDs 10: X85-Y09 e Y35 - Y36, ou seja, óbitos causados por agressão, intervenção legal e operações de guerra.") |>
+  #Título da Tabela
+  adorn_title(placement = "top", row_name = "",
+              col_name = glue::glue("Taxa de Homicídios, por UF {min(year)}–{max(year)}") ) |> 
   #Exportando tabela.
   rio::export(x= _ ,"base/tx_homicidio_uf_br.xlsx")
-rm(base)
 
 
   
