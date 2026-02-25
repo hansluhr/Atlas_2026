@@ -1,0 +1,1246 @@
+---
+title: "Violência Doméstica - Indígenas"
+author: Gabriel Lins - IPEA
+date: "Versão `r format(Sys.time(), '%d de %B, %Y')`"
+output:
+   bookdown::html_document2:   
+    code_folding: hide #Toggle de hide\show de códigos.  
+    theme: readable
+    number_sections: TRUE #Elimina a numeração do bookdown
+    toc: true
+    toc_depth: 3
+    toc_float: 
+      collapsed: FALSE
+      smooth_scroll: TRUE
+   fig_caption: FALSE
+   html_document:
+   html_notebook:
+   #theme: darkly, readable, sandstone, united#html_document:
+   #code_folding: hide #Toggle de hide\show de códigos.  
+---
+
+```{r setup, echo=FALSE, eval=TRUE, warning=FALSE, message=FALSE}
+#Importando pacotes
+library(tidyverse)
+library(janitor)
+library(plotly)
+library(knitr)
+library(bookdown)
+library(gtsummary)
+library(kableExtra)
+load("C:/Users/gabli/Desktop/r/Sinan/sinan_14_23.RData")
+year <- c(2015:2023)
+age <- c(15:59)
+
+#Definir configuração das imagens.
+#knitr::opts_chunk$set(fig.width = ..., fig.height = ...)
+```
+
+# Características das notificações de violência a contra mulher indígena.
+
+## Grupo Agressor
+
+O grupo agressor é elaborado através das variáveis de provável autor da agressão. Os grupos criados são:
+Doméstica, Comunitária, Outros, Ignorado, Misto, Não, Sem informação, Missing, Institucional e Autoprovocada. 
+
+Será considerado violência doméstica notificações cujo provável autor é uma combinação positiva de:
+rel_pai, rel_mae, rel_mad, rel_pad, rel_conj, rel_excon,rel_namo, rel_exnam, rel_filho, rel_irmao, rel_cuida, rel_mad
+
+#### Rotina de criação da variável grupo agressor?
+
+```{r rotina-grupo-viol, eval = FALSE}
+#Criando grupo agressor.
+sinan |>
+  mutate(
+    grupo_viol = case_when(
+ #Se pelo menos duas variáveis factor são "Sim", definir como "Misto"
+ #Misto será as combinações não convergentes na identificação dos grupos de violência.
+ #Exemplo, a combinação rel_pai (doméstica) e rel_patrao (Institucional).
+ #Não está contemplada nas combianções de doméstica ou institucional.
+ #Por ser difícil elaborar classificação de todas as possíveis combinações de autorias, estou considerando como misto àquelas fora dos grupos tradicionas  
+      rowSums(sinan |> 
+                select(rel_pai, rel_mae, rel_pad, rel_conj, rel_excon, rel_namo, 
+                       rel_exnam, rel_filho, rel_desco, rel_irmao,rel_conhec, 
+                       rel_cuida, rel_patrao, rel_inst, rel_pol, rel_propri, 
+                       rel_outros, rel_mad) == "Sim") >= 2 ~ "Misto") ) |> 
+  
+  #Nesta seção cria o grupos tradicionais
+  mutate(grupo_viol = case_when(
+    #Quando todas os autores estão preenchidas com Não.
+    #Essa situação não deveria ocorrer.
+    #Neste caso, as notificações com preenchimento de viol_espec sugerem que essas notificações são tentativas de suicídio\lesão autoprovocada ou acidentes.
+    if_all( c(rel_pai,  rel_mae,  rel_pad, rel_conj, rel_excon, rel_namo, rel_exnam, rel_filho, rel_desco, 
+              rel_irmao, rel_conhec, rel_cuida, rel_patrao, 
+              rel_inst, rel_pol, rel_propri, rel_outros, rel_mad), ~ .x == "Não") ~ "Não",
+    
+    #Quando todas as notificações estão com autoria missing
+    #Esta situação não deveria ocorrer 
+    if_all( c(rel_pai,  rel_mae,  rel_pad, rel_conj, rel_excon, rel_namo, rel_exnam, rel_filho, rel_desco, 
+              rel_irmao, rel_conhec, rel_cuida, rel_patrao, 
+              rel_inst, rel_pol, rel_propri, rel_outros, rel_mad), ~ .x == "Missing") ~ "Missing",
+    
+    #Quando todas as notificações estão com autoria ignorada
+    #Esta situação não deveria ocorrer.
+    if_all( c(rel_pai,  rel_mae,  rel_pad, rel_conj, rel_excon, rel_namo, rel_exnam, rel_filho, rel_desco, 
+              rel_irmao, rel_conhec, rel_cuida, rel_patrao, 
+              rel_inst, rel_pol, rel_propri, rel_outros, rel_mad), ~ .x == "Ignorado") ~ "Ignorado",
+    
+    #Interação entre missing, Não e Ignorado. Neste caso não existe informação sobre provável autor.
+    #Esta situação não deveria ocorrer
+    if_all( c(rel_pai,  rel_mae,  rel_pad, rel_conj, rel_excon, rel_namo, rel_exnam, rel_filho, rel_desco, 
+              rel_irmao, rel_conhec, rel_cuida, rel_patrao,
+              rel_inst, rel_pol, rel_propri, rel_outros, rel_mad), ~ .x %in% c("Não","Missing","Ignorado") )  ~ "Sem Informação",
+    
+    #No caso de grupos de violência o individualizar os grupos considera:
+    #Em doméstica. Se qualquer autoria familar ou combinação de autoria familar for SIM e outras variáveis Não, Missing ou Ignorado, então estou considerando Domésitca 
+    
+    #Situação de autoria doméstica sim (rel_mae) e autorias outras "Não, Missing, "Ignorado" (rel_pol) é considerado como violência doméstica e não como "Ao menos uma"
+    #Estou assumindo que faz pouco sentido combinação de autorias além dos grupos conhecidos.
+    
+    #Portanto, em autorias não existe a categoria "Ao menos uma". 
+    #Não quero fazer hipóteses sobre as categorias não preenchidas. 
+    
+    #Violência doméstica
+    if_any( c(rel_pai, rel_mae, rel_mad, rel_pad, rel_conj, rel_excon,
+              rel_namo, rel_exnam, rel_filho, rel_irmao, rel_cuida, rel_mad), ~.x == "Sim")  &
+      
+      if_all( c(rel_conhec, rel_desco, rel_patrao, rel_inst, 
+                rel_pol, rel_propri, rel_outros), ~ .x %in% c("Não","Missing","Ignorado") ) ~ "Doméstica",
+    
+    #Violência comunitária
+    #Pode conter a combinação rel_conhec e rel_desco
+    if_any( c(rel_conhec, rel_desco ), ~.x == "Sim") & 
+      if_all( 
+        c(#Doméstica
+          rel_pai, rel_mae, rel_mad, rel_pad, rel_conj, rel_excon,
+          rel_namo, rel_exnam, rel_filho, rel_irmao, rel_cuida,
+          #Institucional
+          rel_patrao, rel_inst, rel_pol, 
+          #Autoprovocada
+          rel_propri,
+          #Outros
+          rel_outros), ~ .x %in% c("Não","Missing","Ignorado") ) ~ "Comunitária", 
+    
+    #Violência Institucional
+    if_any( c(rel_patrao, rel_inst, rel_pol), ~.x == "Sim") &
+      if_all(
+        c(#Doméstica
+          rel_pai, rel_mae, rel_mad, rel_pad, rel_conj, rel_excon,
+          rel_namo, rel_exnam, rel_filho, rel_irmao, rel_cuida,
+          #Comunitária
+          rel_conhec, rel_desco,
+          #Autoprovocada
+          rel_propri,
+          #Outros
+          rel_outros ), ~ .x %in% c("Não","Missing","Ignorado") ) ~ "Institucional",
+    
+    #Violência Autoprovocada
+    if_any( c(rel_propri), ~.x == "Sim") &
+      if_all(
+        c(#Doméstica
+          rel_pai, rel_mae, rel_mad, rel_pad, rel_conj, rel_excon,
+          rel_namo, rel_exnam, rel_filho, rel_irmao, rel_cuida,
+          #Comunitária
+          rel_conhec, rel_desco,
+          #Institucional 
+          rel_patrao, rel_inst, rel_pol,
+          #Outros
+          rel_outros ), ~ .x %in% c("Não","Missing","Ignorado") ) ~ "Autoprovocada",
+    
+    #Violência Outros
+    if_any( c(rel_outros), ~.x == "Sim") &
+      
+      if_all(
+        c(#Doméstica
+          rel_pai, rel_mae, rel_mad, rel_pad, rel_conj, rel_excon,
+          rel_namo, rel_exnam, rel_filho, rel_irmao, rel_cuida,
+          #Comunitária
+          rel_conhec, rel_desco,
+          #Institucional 
+          rel_patrao, rel_inst, rel_pol,
+          #Autoprovocada
+          rel_propri ), ~ .x %in% c("Não","Missing","Ignorado") ) ~ "Outros", .default = grupo_viol ) |> as_factor() ) -> sinan  
+```
+
+
+Por grupo agressor, qual a distribuição de sexo da vítima?
+
+De acordo com a tabela \@ref(tab:sexo-g-viol-tab), no grupo agressor doméstica, as mulheres são vítimas em 76,8% das notificações e homens são vítimas em 23,2% das notificações. Portanto, mulheres são as principais vítimas de violência doméstica. Homens são as principais vítimas de violência institucional.
+
+
+```{r sexo-g-viol-tab, tab.cap = "sexo_no_g_viol", echo=FALSE}
+
+sinan |> filter(les_autop!="Sim" & cs_raca == "Indígena" & ano_not %in% year) |>
+  tabyl(grupo_viol,cs_sexo, show_missing_levels = FALSE) |> adorn_totals(where = c("row","col")) %>%
+  adorn_percentages(denominator = "row") %>% adorn_pct_formatting(digits = 1) %>%
+  adorn_ns(position = "front", format_func = function(x) { format(x, big.mark = ".",decimal.mark=",") } ) |>
+  knitr::kable(caption = "Sexo da vítima, por grupo agressor.")
+  
+```
+
+Qual a distribuição do grupo agressor, por sexo da vítima.
+
+A tabela \@ref(tab:g-viol-sexo) nas notificações de vítimas mulheres, a notificação de maior frequência é a violência doméstica, isto é, 58,4% das notificações com vítimas mulheres são violência doméstica. Entre os homens a violência doméstica representa 45,5% das notificações. Dado que mulheres são as principais vítimas de vilência doméstica e a principal violência contra mulher é doméstica, vamos considerar somente notificações de violência doméstica contra mulher.
+
+```{r g-viol-sexo,  tab.cap = "g_viol_sexo" ,echo=FALSE}
+
+sinan |> filter(les_autop!="Sim" & cs_raca == "Indígena" & ano_not %in% year) |>
+  tabyl(grupo_viol,cs_sexo) |> adorn_totals(where = c("row","col")) %>%
+  adorn_percentages(denominator = "col") %>% adorn_pct_formatting(digits = 1) %>%
+  adorn_ns(position = "front", format_func = function(x) format(x, big.mark = ".", decimal.mark=",") )  #|>
+  #knitr::kable(caption = "Grupo agressor, por sexo da vítima.")
+
+```
+
+### Provável autor da violência doméstica. 
+O grupo agressor doméstica assume violência causada por ao menos um dos autores a seguir:
+
+Pai, mãe, madrasta, padrasto, cônjuge, EX-cônjuge, namorado(a), EX-namorado(a), filho(a), irmão(ã) ou cuidadora.
+
+Esssa agregação de autores, esconde possíveis diferenças de autoria ao longo do ciclo de vida. Assim, foi criada variável individualizando o provável autor da agressão. Nesta variável, agressão causada por pai e mãe aparece como Pai e Mãe.
+
+```{r idade-nome-viol-mulher-fig, fig.cap="Provável autor de violência doméstica - Mulheres", echo=FALSE, out.height = "100%", out.width="100%"}
+
+sinan |> 
+  dplyr::filter(cs_sexo == "Mulher" & cs_raca == "Indígena" & les_autop!="Sim" & ano_not %in% year & !is.na(idade) &
+                  nome_rel != "Não/Ignorado/Missing" & grupo_viol == "Doméstica") |> droplevels() |>
+  mutate(
+    #Transforma contagens pouco frequentes na categoria outros   
+    nome_rel = nome_rel |> fct_lump(prop = 0.003, other_level = "Outros"), 
+    #Transforma idade superior a 80 para 80.  
+    idade = case_when(idade >= 80 ~ 80, .default = idade) ) |> 
+  
+  #Contagem de tipo de violência por idade
+  count(idade,nome_rel, name = "n", .drop = FALSE) |>
+  
+  mutate(
+  #Proporção da violência na idade
+  p_nome_rel = round( ( n/sum(n) )*100,1) , .by = c(idade) ) |>
+  #Gráfico
+  ggplot() +
+  geom_line( aes(x = idade, y = p_nome_rel, color = nome_rel ) ) + geom_point( aes(x = idade, y = p_nome_rel, color = nome_rel ) ) +
+  #Apontações de algumas autoria.
+  #Namorado
+  # annotate("text", x = 12.5, y = 40, label = "Namorado", size = 3.5, alpha = 0.6) + 
+  # #Pai
+  # annotate("text", x = 0, y = 15, label = "Pai", size = 3.5, alpha = 0.6) + 
+  # #Padrasto
+  # annotate("text", x  = 10,  y = 30, label = "Padrasto", size = 2, alpha = 0.6) + 
+  # #Ex-Cônjuge
+  # annotate("text", x  = 33,  y = 29, label = "Ex-Cônjuge", size = 3.5, alpha = 0.6) +
+  
+  scale_x_continuous(breaks = seq(0,80,2) ) + scale_y_continuous(breaks = seq(0,80,5), labels = scales::label_percent(scale = 1) ) +
+  guides(color = guide_legend(position = "inside",nrow = 3) ) +
+  theme(legend.position.inside = c(0.4, 0.93),
+        axis.text.x=element_text(size=6.5),axis.text.y=element_text(size=6.5),
+        axis.title.x=element_text(size=8),axis.title.y=element_text(size=8),
+        plot.title = element_text(size=9),
+        legend.key = element_rect(fill = "transparent", colour = NA),
+        legend.background = element_rect(fill = "transparent", colour = NA) ) +
+  labs(x="Idade", y = "%de provável autor na Idade", color = "", title = "Provável autor de violência doméstica") -> p
+ggplotly(p)
+rm(p)
+
+```
+
+A figura \@ref(fig:idade-nome-viol-mulher-fig) apresenta a distribuição dos prováveis autores de violência doméstica ao longo da vida de mulheres vítimas de violência doméstica. Existe variação do provável autor de violência doméstica ao longo da vida. Na infância são pai ou mãe e pai e mãe. Na Adolescência são Padastro e namorado.A partir dos 16 até ~60 anos é Cônjuge ou **EX**-Côjuge. Na velhice é filho(a). Portato, no grupo agressor doméstico, existe diferença entre violência familiar e íntima.
+O gráfico de vítimas homems é qualitativamente igual.
+
+
+Autoria individualizada pode ser explorada na seção sobre LBGT e PCD. Por exemplo identificando provável autor de notificações motivadas por homofobia.
+
+
+A individualização da autoria é a melhor maneira de apresentar as autorias?
+Ao criar categorias com as combinações de autoria, não são apresentadas o total de autorias. Exemplo, o total de notificações com pai de provável autor não contabiliza a sitação Pai e Mãe.
+
+
+> No grupo agressor doméstica, qual o tipo de violência de maior frequência?
+
+### Tipo de violência
+
+Como a Variável tipo de violência foi elaborda? A ideia é igualar o número de violências ao número de notificações, evitando tabelas com vários resultados diferentes.
+
+```{r script_t_viol, eval=FALSE}
+sinan |>
+  mutate(t_viol = case_when(
+    #Quando todas as violências estão preenchidas com Não.
+    #Essa situação não deveria ocorrer.
+    #Neste caso, as notificações com preenchimento de viol_espec sugerem que essas notificações são tentativas de suicídio\lesão autoprovocada
+    if_all( c(viol_fisic, viol_psico, viol_tort, viol_sexu, viol_traf, viol_finan, viol_negli, viol_infan, viol_legal, viol_outr), ~ .x == "Não") ~ "Não", 
+    
+    #Quando todas as violências não estão preenchidas
+    #Esta situação não deveria ocorrer 
+    if_all( c(viol_fisic, viol_psico, viol_tort, viol_sexu, viol_traf, viol_finan, viol_negli, viol_infan, viol_legal, viol_outr), ~ .x == "Missing") ~ "Missing",
+    
+    #Quando todas as violências são missing, então missing
+    if_all( c(viol_fisic, viol_psico, viol_tort, viol_sexu, viol_traf, viol_finan, viol_negli, viol_infan, viol_legal, viol_outr), ~ .x == "Ignorado") ~ "Ignorado",
+    
+    #Interação entre missing, Não se Aplica e Ignorado
+    if_all( c(viol_fisic, viol_psico, viol_tort, viol_sexu, viol_traf,
+              viol_finan, viol_negli, viol_infan, viol_legal, viol_outr), ~ .x %in% c("Não","Missing","Ignorado") )  ~ "Sem Informação", 
+    
+    #Individualizar significa ter certeza das deficiências. 
+    #Então viol_fisic == "Sim" e viol_tort == "Ignorado" não é ter certeza. Ignorado pode ser Sim. 
+    #Somente Violência Física
+    viol_fisic == "Sim" & if_all( c(viol_psico, viol_tort, viol_sexu, viol_traf, 
+                                    viol_finan, viol_negli, viol_infan, viol_legal, viol_outr), ~ .x == "Não") ~ "V.Física",
+    #Somente tortura
+    viol_tort == "Sim" & if_all( c(viol_psico, viol_fisic, viol_sexu, viol_traf, 
+                                   viol_finan, viol_negli, viol_infan, viol_legal, viol_outr), ~ .x == "Não") ~ "Tortura", 
+    
+    #Somente violência sexual
+    viol_sexu == "Sim" & if_all( c(viol_psico, viol_tort, viol_fisic, viol_traf, 
+                                   viol_finan, viol_negli, viol_infan, viol_legal, viol_outr), ~ .x == "Não") ~ "V.Sexual",
+    #Somente Negligência
+    viol_negli == "Sim" & if_all( c(viol_psico, viol_tort, viol_fisic, viol_traf, 
+                                    viol_finan, viol_sexu, viol_infan, viol_legal, viol_outr), ~ .x == "Não") ~ "Negligência",
+    
+    #Somente Viol. Psicológica inclui psicológica e financeira/econômica),
+    if_any( c(viol_psico,viol_finan), ~.x == "Sim" ) &
+      if_all( c(viol_tort, viol_fisic, viol_traf, 
+                viol_sexu, viol_infan, viol_legal, viol_outr), ~ .x == "Não") ~ "V.Psico",
+    
+    #Somente intervenção legal
+    viol_legal == "Sim" & if_all( c(viol_psico, viol_tort, viol_fisic, viol_traf, 
+                                    viol_finan, viol_sexu, viol_infan, viol_negli, viol_outr), ~ .x == "Não") ~ "Int. Legal",
+    
+    #Ao menos um tipo de violência é SIM.
+    if_any( c(viol_fisic, viol_psico, viol_tort, viol_sexu, viol_traf, viol_finan, viol_negli, viol_infan, viol_legal, viol_outr), ~.x == "Sim" ) &
+      if_any( c(viol_fisic, viol_psico, viol_tort, viol_sexu, viol_traf, 
+                viol_finan, viol_negli, viol_infan, viol_legal, viol_outr), ~.x %in% c("Não","Missing","Ignorado") )  ~ "Ao menos uma") ) |>
+  #Em violência múltiplas basta duas viols == "Sim".Aqui vai substituir Ao menos uma erradas.
+  mutate(
+    t_viol = case_when(
+      # Se pelo menos duas variáveis factor forem "Sim", definir como "Múltiplas"
+      rowSums(sinan |> select(viol_fisic, viol_psico, viol_tort, viol_sexu,
+                              viol_traf, viol_finan, viol_negli, viol_infan, viol_legal, viol_outr) == "Sim") >= 2 ~ "Múltiplas",
+      .default = t_viol) |> as_factor() ) -> sinan
+
+```
+
+> Qual a distribuição de tipo de violência doméstica?
+
+De acordo com a \@ref(tab:t-viol-sexo-tab), em notificações de vítimas mulheres, Violência Física (36,5%) é o tipo de violência de maior frequência, seguido por Mútiplas (32,7%) e Negligência (11,6%). Por construção a categoria "Múltiplas" agrega combinação de diversas agressões. Ao mesmo tempo, essa agregação esconde o tipo de agressão cometida. Contornando essa limitação eu elaborei variável individualizando as combinações de agressão. Isto é, a categoria de agressão são todas as possíveis agressões notificadas. Exemplo, se ocorreu violência sexual, física e tortura, a categoria de violência será o nome destas três agressões.
+
+
+```{r t-viol-sexo-tab, tab.cap = "t-viol-sexo", echo=FALSE}
+sinan |> 
+  filter(les_autop!="Sim" & cs_raca == "Indígena" & ano_not %in% year & grupo_viol == "Doméstica") |> 
+  tabyl(t_viol, cs_sexo) |> adorn_totals(where = c("row","col")) %>%
+  adorn_percentages(denominator = "col") %>% adorn_pct_formatting(digits = 1) %>%
+  adorn_ns(position = "front", format_func = function(x) { format(x, big.mark = ".", decimal.mark = ",") } ) |> 
+  knitr::kable(caption = "Tipo de violênica - Doméstica")
+```
+
+A figura \@ref(fig:t-viol-fig) apresenta a distribuição do tipo de violência ao longo do ciclo de vida da mulher vitimada pelo grupo agressor doméstico. Os achados apontam predomínio de negligência no início e final da vida. Violência sexual é o tipo de maior frequência entre o final da infância e início da adolescência. Violência física aparece como o tipo de violência de maior frequência ao longo da vida adulta. Fiz filtro considerando somente os tipos de violência relevantes.
+
+```{r t-viol-fig, fig.cap="Tipo de violência", echo=FALSE, out.height = "100%", out.width="100%"}
+#Proporção do tipo de violência no clico de vida.
+sinan |> 
+    filter(t_viol %in% c("V.Física","Negligência","V.Sexual","V.Psico","Int. Legal","Tortura",'Múltiplas',"Ao menos uma") &
+         cs_raca == "Indígena" &    
+         cs_sexo == "Mulher" & les_autop!="Sim" & ano_not %in% year & !is.na(idade) ) |> droplevels() |>
+  mutate(
+  #Transforma idade superior a 80 para 80.  
+  idade = case_when(idade >= 80 ~ 80, .default = idade) ) |> 
+  #Contagem de tipo de violência por idade
+  count(idade,t_viol, name = "n", .drop = FALSE) |>
+  mutate(
+  #Proporção da violência na idade
+  p_t_viol = round( ( n/sum(n) )*100,1) , .by = c(idade) ) |> 
+  #Gráfico
+  ggplot() +
+  geom_line( aes(x = idade, y = p_t_viol, color = t_viol ) ) + geom_point( aes(x = idade, y = p_t_viol, color = t_viol ) ) +
+  scale_x_continuous(breaks = seq(0,80,2) ) + scale_y_continuous(breaks = seq(0,80,5), labels = scales::label_percent(scale = 1) ) +
+  guides(color = guide_legend(position = "inside",nrow = 3) ) +
+  theme(legend.position.inside = c(0.4, 0.93),
+        axis.text.x=element_text(size=6.5),axis.text.y=element_text(size=6.5),
+        axis.title.x=element_text(size=8),axis.title.y=element_text(size=8),
+        plot.title = element_text(size=9),
+        legend.key = element_rect(fill = "transparent", colour = NA),
+        legend.background = element_rect(fill = "transparent", colour = NA) ) +
+  labs(x="Idade", y = "%de violência na Idade", color = "", title = "Tipo de violência")  -> p
+ggplotly(p)
+rm(p)
+
+```
+
+A tabela \@ref(tab:t-viol-sexo-tab) indica preenchimento do tipo violência "Múltipla" em 32,7% das notificações. Enquanto o gráfico \@ref(fig:t-viol-fig) aponta expressiva ocorrência de violências múltiplas ao longo da vida. A categoria múltiplas representa situação de múltiplas violência. No entanto, esconde a combinação destas violências.
+
+O manual instrutivo de preenchimento do SINAN indica que deverá ser preenchido somente o principal tipo de violência, os demais campos de violência não devem ser preenchidos e, caso haja alguma violência secundária perpetrada pelo mesmo(a) autor(a), registar essa informação no campo de observações adicionais. Em geral a variável disponível para descrever violências adicionais - quando preenchida - informa a situação da violência. Por exemplo, "BRIGA/PAI/MAE", "RELACAO SEXUAL" e "TENTATIVA DE SUICIDIO". Dado a prática de não cumprimento da instrução de preenchimento e aparente inadequado preenchimento da variável de violências adicionais, eu elaborarei variável agregando o nome das violências registradas na notificação. 
+
+
+```{r idade-nome-viol-fig, fig.cap= "Violência individualizada", echo=FALSE, out.height = "100%", out.width="100%"}
+
+sinan |> 
+   dplyr::filter(cs_sexo == "Mulher" & 
+                   cs_raca == "Indígena" &
+                   les_autop!="Sim" & ano_not %in% year & !is.na(idade) & grupo_viol == "Doméstica") |> droplevels() |>
+  
+  mutate(
+  #Transforma contagens pouco frequentes na categoria outros   
+  nome_viol = nome_viol |> fct_lump(prop = 0.005, other_level = "Outros"), 
+  #Transforma idade superior a 80 para 80.  
+  idade = case_when(idade >= 80 ~ 80, .default = idade) ) |> 
+  
+  #Contagem de tipo de violência por idade
+  count(idade,nome_viol, name = "n", .drop = FALSE) |>
+  
+  mutate(
+  #Proporção da violência na idade
+  p_nome_rel = round( ( n/sum(n) )*100,1) , .by = c(idade) ) |>
+  #Gráfico
+  ggplot() +
+  geom_line( aes(x = idade, y = p_nome_rel, color = nome_viol ) ) + geom_point( aes(x = idade, y = p_nome_rel, color = nome_viol ) ) +
+  scale_x_continuous(breaks = seq(0,80,2) ) + scale_y_continuous(breaks = seq(0,85,5), labels = scales::label_percent(scale = 1) ) +
+  guides(color = guide_legend(position = "inside",nrow = 4) ) +
+  theme(legend.position.inside = c(0.5, 0.90),
+        axis.text.x=element_text(size=6.5),axis.text.y=element_text(size=6.5),
+        axis.title.x=element_text(size=8),axis.title.y=element_text(size=8),
+        plot.title = element_text(size = 9), legend.title=element_text(size=8),
+        legend.key = element_rect(fill = "transparent", colour = NA),
+        legend.background = element_rect(fill = "transparent", colour = NA) ) +
+  labs(x="Idade", y = "% de violência na Idade", color = "",title = "Violência individualizada") -> p
+ggplotly(p)
+rm(p)
+
+```
+
+Similar ao observado na variável grupo agressor, a variável tipo de violência elabora categorias a partir dos tipos de agressões notificados.
+A categoria múltiplas representa situação de múltiplas violência. No entanto, esconde a combinação destas violências. Por isso, similar a individualização do provável autor, foi construida variável identificando as combinações de violências.
+
+A figura \@ref(fig:idade-nome-viol-fig) apresenta a distribuição das violências individualizadas ao longo do ciclo de vida. Enquanto a violência múltipla registrada a partir dos 18 anos está associada a violência física e violência psicológica, as violências múltiplas registradas na infância\\adolescência são combinações de diversas violências múltiplas. A descoberta de mudança no padrão de violências múltiplas ao longo da vida, justifica a elaboração de variável individualizando as violências. 
+
+
+### Interseção provável autor e tipo de violência.
+
+Vamos olhar a interseção entre provável autor e tipo de violência no grupo agressor doméstica.
+
+Algumas idades estão preenchidas de maneira errada. Por exemplo, na figura \@ref(fig:nome-rel-conjuge-fig) existem vítimas de 3 anos com provável autor Cônjuge.
+Parece razoável pensar ser o Cônjuge da mãe. Também não parece razóavel vítimas com 80 anos com provável autor mãe \@ref(fig:mae).
+
+Podemos explorar ao longo dos anos as diferentes violências provocados pelos diferentes autores. 
+
+Violência sexual em crianças causada por namorado, cônjuge, pai e padrasto.
+A violência física de cônjuge e ex-cônjuge.
+Negligência provocada por pai, mãe e pai e mãe.
+A negligência provocada por filhos em idosos.
+
+As figuras a seguir apresentam a violência individualizada de acordo com cada provável autor. 
+
+```{r nome-rel-conjuge-fig, fig.cap="Cônjuge", out.height = "100%", out.width="100%", echo=FALSE}
+#Pensei em apresentar a distribuição de idade na parte externa do gráfico, mas as manipulações de construção do gráfico igualam o número de idades.
+#library("ggExtra")
+
+#Cônjuge
+sinan |>
+    dplyr::filter(cs_sexo == "Mulher" & cs_raca == "Indígena" &
+          les_autop!="Sim" & ano_not %in% year & !is.na(idade) & grupo_viol == "Doméstica" &
+          #Grupo de interesse na violência doméstica
+          nome_rel == "rel_conj") |> droplevels() |>
+     mutate(
+      #Transforma contagens pouco frequentes na categoria outros
+      nome_viol = nome_viol |> fct_lump(prop = 0.003, other_level = "Outros"),
+      #Transforma idade superior a 80 para 80.
+      idade = case_when(idade >= 80 ~ 80, .default = idade) ) |>
+
+    #Contagem de tipo de violência por idade
+    count(idade,nome_viol, name = "n", .drop = FALSE) |>
+
+    mutate(
+    #Proporção da violência na idade
+    p_nome_viol = round( ( n/sum(n) )*100,1) , .by = c(idade) ) |>
+
+    #Gráfico
+    ggplot() +
+    geom_line( aes(x = idade, y = p_nome_viol, color = nome_viol ) ) + geom_point( aes(x = idade, y = p_nome_viol, color = nome_viol ) ) +
+    scale_x_continuous(breaks = seq(0,80,2) ) + scale_y_continuous(breaks = seq(0,80,5), labels = scales::label_percent(scale = 1) ) +
+    guides(color = guide_legend(position = "inside",nrow = 4) ) +
+    theme(legend.position.inside = c(0.6, 0.93),
+          axis.text.x=element_text(size=6.5),axis.text.y=element_text(size=6.5),
+          axis.title.x=element_text(size=8),axis.title.y=element_text(size=8),
+          plot.title = element_text(size = 9), legend.title=element_text(size=8),
+          legend.key = element_rect(fill = "transparent", colour = NA),
+          legend.background = element_rect(fill = "transparent", colour = NA) ) +
+    labs(x="Idade", y = "% de violência na Idade", color = "", title = "Provável autor - Cônjuge") -> p
+ggplotly(p)  
+
+```
+
+
+Cônjuge e EX-cônjuge são os principais agressores. 
+É interessante uma seção dedicada a estes agressores, apresentando características da agressão.
+Exemplo, autor alocolizado? Instrumento utilizado, Reincidência, local e hora de ocorrência.
+
+
+```{r ex-conjuge, out.height = "100%", out.width="100%", echo=FALSE}
+#Ex Cônjuge
+sinan |>
+    dplyr::filter(cs_sexo == "Mulher" & cs_raca == "Indígena" &
+          les_autop!="Sim" & ano_not %in% year & !is.na(idade) & grupo_viol == "Doméstica" &
+          #Grupo de interesse na violência doméstica
+          nome_rel == "rel_excon") |> droplevels() |>
+     mutate(
+      #Transforma contagens pouco frequentes na categoria outros   
+      nome_viol = nome_viol |> fct_lump(prop = 0.005, other_level = "Outros"), 
+      #Transforma idade superior a 80 para 80.  
+      idade = case_when(idade >= 80 ~ 80, .default = idade) ) |> 
+    
+    #Contagem de tipo de violência por idade
+    count(idade,nome_viol, name = "n", .drop = FALSE) |>
+    
+    mutate(
+      #Proporção da violência na idade
+      p_nome_viol = round( ( n/sum(n) )*100,1) , .by = c(idade) ) |>
+
+    #Gráfico
+    ggplot() +
+    geom_line( aes(x = idade, y = p_nome_viol, color = nome_viol ) ) + geom_point( aes(x = idade, y = p_nome_viol, color = nome_viol ) ) +
+    scale_x_continuous(breaks = seq(0,80,2) ) + scale_y_continuous(breaks = seq(0,80,5), labels = scales::label_percent(scale = 1) ) +
+    guides(color = guide_legend(position = "inside", ncol = 3) ) +
+    theme(legend.position.inside = c(0.75, 0.93),
+          axis.text.x=element_text(size=6.5),axis.text.y=element_text(size=6.5),
+          axis.title.x=element_text(size=8),axis.title.y=element_text(size=8),
+          plot.title = element_text(size = 9), legend.title=element_text(size=8),
+          legend.key = element_rect(fill = "transparent", colour = NA),
+          legend.background = element_rect(fill = "transparent", colour = NA) ) +
+    labs(x="Idade", y = "% de violência na Idade", color = "", title = "Provável autor - Ex Cônjuge") -> p
+ggplotly(p)
+```
+
+
+```{r namorado, out.height = "100%", out.width="100%", echo=FALSE}
+#Namorado
+sinan |>
+    dplyr::filter(cs_sexo == "Mulher" & cs_raca == "Indígena" &
+          les_autop!="Sim" & ano_not %in% year & !is.na(idade) & grupo_viol == "Doméstica" &
+          #Grupo de interesse na violência doméstica
+          nome_rel == "rel_namo") |> droplevels() |>
+     mutate(
+      #Transforma contagens pouco frequentes na categoria outros   
+      nome_viol = nome_viol |> fct_lump(prop = 0.005, other_level = "Outros"), 
+      #Transforma idade superior a 80 para 80.  
+      idade = case_when(idade >= 80 ~ 80, .default = idade) ) |> 
+    
+    #Contagem de tipo de violência por idade
+    count(idade,nome_viol, name = "n", .drop = FALSE) |>
+    
+    mutate(
+      #Proporção da violência na idade
+      p_nome_viol = round( ( n/sum(n) )*100,1) , .by = c(idade) ) |>
+
+    #Gráfico
+    ggplot() +
+    geom_line( aes(x = idade, y = p_nome_viol, color = nome_viol ) ) + geom_point( aes(x = idade, y = p_nome_viol, color = nome_viol ) ) +
+    scale_x_continuous(breaks = seq(0,80,2) ) + scale_y_continuous(breaks = seq(0,100,5), labels = scales::label_percent(scale = 1) ) +
+    guides(color = guide_legend(position = "inside", ncol = 3) ) +
+    theme(legend.position.inside = c(0.75, 0.93),
+          axis.text.x=element_text(size=6.5),axis.text.y=element_text(size=6.5),
+          axis.title.x=element_text(size=8),axis.title.y=element_text(size=8),
+          plot.title = element_text(size = 9), legend.title=element_text(size=8),
+          legend.key = element_rect(fill = "transparent", colour = NA),
+          legend.background = element_rect(fill = "transparent", colour = NA) ) +
+    labs(x="Idade", y = "% de violência na Idade", color = "", title = "Provável autor - Namorado") -> p
+ggplotly(p)
+```
+
+
+```{r filho, out.height = "100%", out.width="100%", echo=FALSE}
+#Filho
+sinan |>
+    dplyr::filter(cs_sexo == "Mulher" & cs_raca == "Indígena" &
+          les_autop!="Sim" & ano_not %in% year & !is.na(idade) & grupo_viol == "Doméstica" &
+          #Grupo de interesse na violência doméstica
+          nome_rel == "rel_filho") |> droplevels() |>
+     mutate(
+      #Transforma contagens pouco frequentes na categoria outros   
+      nome_viol = nome_viol |> fct_lump(prop = 0.005, other_level = "Outros"), 
+      #Transforma idade superior a 80 para 80.  
+      idade = case_when(idade >= 80 ~ 80, .default = idade) ) |> 
+    
+    #Contagem de tipo de violência por idade
+    count(idade,nome_viol, name = "n", .drop = FALSE) |>
+    
+    mutate(
+      #Proporção da violência na idade
+      p_nome_viol = round( ( n/sum(n) )*100,1) , .by = c(idade) ) |>
+
+    #Gráfico
+    ggplot() +
+    geom_line( aes(x = idade, y = p_nome_viol, color = nome_viol ) ) + geom_point( aes(x = idade, y = p_nome_viol, color = nome_viol ) ) +
+    scale_x_continuous(breaks = seq(0,80,2) ) + scale_y_continuous(breaks = seq(0,80,5), labels = scales::label_percent(scale = 1) ) +
+    guides(color = guide_legend(position = "inside", ncol = 3) ) +
+    theme(legend.position.inside = c(0.75, 0.93),
+          axis.text.x=element_text(size=6.5),axis.text.y=element_text(size=6.5),
+          axis.title.x=element_text(size=8),axis.title.y=element_text(size=8),
+          plot.title = element_text(size = 9), legend.title=element_text(size=8),
+          legend.key = element_rect(fill = "transparent", colour = NA),
+          legend.background = element_rect(fill = "transparent", colour = NA) ) +
+    labs(x="Idade", y = "% de violência na Idade", color = "", title = "Provável autor - Filho(a)") -> p
+ggplotly(p)
+```
+
+
+```{r mae, fig.cap ="Mãe", out.height = "100%", out.width="100%", echo=FALSE}
+#Mãe
+sinan |>
+    dplyr::filter(cs_sexo == "Mulher" & cs_raca == "Indígena" &
+          les_autop!="Sim" & ano_not %in% year & !is.na(idade) & grupo_viol == "Doméstica" &
+          #Grupo de interesse na violência doméstica
+          nome_rel == "rel_mae") |> droplevels() |>
+     mutate(
+      #Transforma contagens pouco frequentes na categoria outros   
+      nome_viol = nome_viol |> fct_lump(prop = 0.005, other_level = "Outros"), 
+      #Transforma idade superior a 80 para 80.  
+      idade = case_when(idade >= 80 ~ 80, .default = idade) ) |> 
+    
+    #Contagem de tipo de violência por idade
+    count(idade,nome_viol, name = "n", .drop = FALSE) |>
+    
+    mutate(
+      #Proporção da violência na idade
+      p_nome_viol = round( ( n/sum(n) )*100,1) , .by = c(idade) ) |>
+
+    #Gráfico
+    ggplot() +
+    geom_line( aes(x = idade, y = p_nome_viol, color = nome_viol ) ) + geom_point( aes(x = idade, y = p_nome_viol, color = nome_viol ) ) +
+    scale_x_continuous(breaks = seq(0,80,2) ) + scale_y_continuous(breaks = seq(0,100,5), labels = scales::label_percent(scale = 1) ) +
+    guides(color = guide_legend(position = "inside", ncol = 3) ) +
+    theme(legend.position.inside = c(0.75, 0.93),
+          axis.text.x=element_text(size=6.5),axis.text.y=element_text(size=6.5),
+          axis.title.x=element_text(size=8),axis.title.y=element_text(size=8),
+          plot.title = element_text(size = 9), legend.title=element_text(size=8),
+          legend.key = element_rect(fill = "transparent", colour = NA),
+          legend.background = element_rect(fill = "transparent", colour = NA) ) +
+    labs(x="Idade", y = "% de violência na Idade", color = "", title = "Provável autor - Mãe") -> p
+ggplotly(p)
+```
+
+
+```{r pai, out.height = "100%", out.width="100%", echo=FALSE}
+#Pai
+sinan |>
+    dplyr::filter(cs_sexo == "Mulher" & cs_raca == "Indígena" &
+          les_autop!="Sim" & ano_not %in% year & !is.na(idade) & grupo_viol == "Doméstica" &
+          #Grupo de interesse na violência doméstica
+          nome_rel == "rel_pai") |> droplevels() |>
+     mutate(
+      #Transforma contagens pouco frequentes na categoria outros   
+      nome_viol = nome_viol |> fct_lump(prop = 0.005, other_level = "Outros"), 
+      #Transforma idade superior a 80 para 80.  
+      idade = case_when(idade >= 80 ~ 80, .default = idade) ) |> 
+    
+    #Contagem de tipo de violência por idade
+    count(idade,nome_viol, name = "n", .drop = FALSE) |>
+    
+    mutate(
+      #Proporção da violência na idade
+      p_nome_viol = round( ( n/sum(n) )*100,1) , .by = c(idade) ) |>
+
+    #Gráfico
+    ggplot() +
+    geom_line( aes(x = idade, y = p_nome_viol, color = nome_viol ) ) + geom_point( aes(x = idade, y = p_nome_viol, color = nome_viol ) ) +
+    scale_x_continuous(breaks = seq(0,80,2) ) + scale_y_continuous(breaks = seq(0,100,5), labels = scales::label_percent(scale = 1) ) +
+    guides(color = guide_legend(position = "inside", ncol = 3) ) +
+    theme(legend.position.inside = c(0.75, 0.93),
+          axis.text.x=element_text(size=6.5),axis.text.y=element_text(size=6.5),
+          axis.title.x=element_text(size=8),axis.title.y=element_text(size=8),
+          plot.title = element_text(size = 9), legend.title=element_text(size=8),
+          legend.key = element_rect(fill = "transparent", colour = NA),
+          legend.background = element_rect(fill = "transparent", colour = NA) ) +
+    labs(x="Idade", y = "% de violência na Idade", color = "", title = "Provável autor - Pai") -> p
+ggplotly(p)
+```
+
+
+```{r Padrasto, out.height = "100%", out.width="100%", echo=FALSE}
+#Padrasto
+sinan |>
+    dplyr::filter(cs_sexo == "Mulher" & cs_raca == "Indígena" &
+          les_autop!="Sim" & ano_not %in% year & !is.na(idade) & grupo_viol == "Doméstica" &
+          #Grupo de interesse na violência doméstica
+          nome_rel == "rel_pad") |> droplevels() |>
+     mutate(
+      #Transforma contagens pouco frequentes na categoria outros   
+      nome_viol = nome_viol |> fct_lump(prop = 0.005, other_level = "Outros"), 
+      #Transforma idade superior a 80 para 80.  
+      idade = case_when(idade >= 80 ~ 80, .default = idade) ) |> 
+    
+    #Contagem de tipo de violência por idade
+    count(idade,nome_viol, name = "n", .drop = FALSE) |>
+    
+    mutate(
+      #Proporção da violência na idade
+      p_nome_viol = round( ( n/sum(n) )*100,1) , .by = c(idade) ) |>
+
+    #Gráfico
+    ggplot() +
+    geom_line( aes(x = idade, y = p_nome_viol, color = nome_viol ) ) + geom_point( aes(x = idade, y = p_nome_viol, color = nome_viol ) ) +
+    scale_x_continuous(breaks = seq(0,80,2) ) + scale_y_continuous(breaks = seq(0,100,5), labels = scales::label_percent(scale = 1) ) +
+    guides(color = guide_legend(position = "inside", ncol = 3) ) +
+    theme(legend.position.inside = c(0.75, 0.93),
+          axis.text.x=element_text(size=6.5),axis.text.y=element_text(size=6.5),
+          axis.title.x=element_text(size=8),axis.title.y=element_text(size=8),
+          plot.title = element_text(size = 9), legend.title=element_text(size=8),
+          legend.key = element_rect(fill = "transparent", colour = NA),
+          legend.background = element_rect(fill = "transparent", colour = NA) ) +
+    labs(x="Idade", y = "% de violência na Idade", color = "", title = "Provável autor - Padrasto") -> p
+ggplotly(p)
+rm(p)
+```
+
+
+### Reincidência
+
+A nota técnica nº 36 diz:
+
+É  importante  destacar,  ainda,  que  a  situação  de  violência  se  conﬁgura,  frequentemente,  como  um  quadro
+crônico e recorrente. Por esse motivo, nos casos de violência crônica, ou de repetição, **deve-se registrar na notiﬁcação a ocorrência mais recente**. 
+
+Para  isso,  no campo 9  (Data  da  ocorrência  da  violência),  indique a  data  de  ocorrência  da  última  agressão sofrida e caso se trate de violência de repetição, no campo 53 (Ocorreu outras vezes?), preencha a opção 1 - Sim. Preencha toda a notiﬁcação com a descrição da última violência sofrida. 
+A variávl ocorreu outras vezes será utilizada no trabalho sobre reincidência.
+
+
+De acordo com a \@ref(tab:rein), 52,8% das notificações de violência doméstica contra mulheres aconteceram mais de um vez. Quando o provável autor é o cônjuge 60,1% das notificações ocorreram mais de uma vez.
+
+```{r rein, tab.cap = "Ocorreu outras vezes?", echo=FALSE}
+
+sinan |> 
+  dplyr::filter(cs_sexo == "Mulher" & les_autop!="Sim" & 
+                ano_not %in% year & cs_raca == "Indígena" &
+                grupo_viol == "Doméstica") |> droplevels() |>
+  mutate(
+    #Transforma contagens pouco frequentes na categoria outros   
+    nome_rel = nome_rel |> fct_lump(prop = 0.005, other_level = "Outros") ) |>
+  
+  tabyl(nome_rel,out_vezes)  |> adorn_totals(where = c("row","col") ) %>%
+  adorn_percentages(denominator = "row") %>% adorn_pct_formatting(digits = 1) %>%
+  adorn_ns(position = "front", format_func = function(x) { format(x, big.mark = ".", decimal.mark = ",") }) |> 
+  knitr::kable(caption = "Reincidência - Violência Doméstica")
+  
+```
+
+
+
+Existe diferença no perfil dentre vitimadas mais de uma vez e primeira vez?
+
+A tabela \@ref(tab:out-vez-geral) apresenta o perfil da mulher vítima de violência doméstica, de acordo com a reincidência da violência.
+O trabalho sobre reicidência busca identificar os previsores da reincidência. Os achados deste trabalho e análise sobre diferenças no perfil das vitimas, de acordo com a reinciência, podem entrar em edições futuras do atlas.
+
+
+```{r out-vez-geral, tab.cap = "Perfil Outra vez", echo=FALSE, message=FALSE, warning=FALSE}
+library(kableExtra)
+
+theme_gtsummary_language(language  = "pt", big.mark = ".",decimal.mark=",")
+#Tabela com características da vítima, por reincidência.
+sinan |> 
+  dplyr::filter(cs_sexo == "Mulher" & les_autop!="Sim" & 
+                ano_not %in% year & cs_raca == "Indígena" &
+                grupo_viol == "Doméstica") |> droplevels() |>
+  select(out_vezes, idade, autor_alco, cs_gestant, cs_raca, cs_escol_n, orient_sex, ident_gen, tipodef) |>
+  
+  tbl_summary(
+    by = out_vezes,
+    # don't list missing data separately
+              missing = "no",
+   #Alterando o label das variáveis 
+    label = list(idade ~ "Idade", cs_escol_n ~ "Escolaridade", autor_alco ~ "Provável autor com suspeita de álcool",
+                 cs_gestant ~ "Idade Gestacional", cs_raca ~ "Raça\\Cor", orient_sex ~ "Orientação Sexual", ident_gen ~ "Identidade de Gênero",
+                 tipodef ~ "Tipo de deficiência"),
+   
+       type = all_continuous() ~ "continuous2",
+    #Alterando estatísticas utilizadas
+    statistic = all_continuous() ~ c(
+      "{N_nonmiss} ({p_nonmiss}%)",
+      "{N_miss} ({p_miss}%)",
+      "{mean} ({sd})",
+      "{median} ({p25}, {p75})",
+      "{min} - {max}"),
+   
+     #Alterando número de dígitos em cada linha das estatísticas de idade.
+    digits = list(idade ~ c(0,1,0,1,1,1,1,1,0,0) ) ) |>
+  
+    #Alterando label das estatísticas de idade.
+    add_stat_label(label = idade ~ c("N(%)", "N faltante (%)", "Média (SD)", "Mediana (IQR)", "Min - Max")) |>
+    
+    #Alterando header da tabela
+    modify_spanning_header(c("stat_1","stat_2","stat_3","stat_4") ~ "**Informar se a violência é de repetição**") %>%
+    #
+    modify_header(label = "**Características**",   # update the column header
+                  #Alterando as estatísticas dos totais apresentados no topo da tabela.
+                  all_stat_cols() ~ "**{level}** N = {style_number(n, big.mark = '.', decimal.mark = ',')} ({style_percent(p,digits = 1)}%)") |> 
+    bold_labels() %>% kable(label = NA) %>%
+    kable_styling("striped", full_width = F) %>% scroll_box(width = "1000px", height = "700px")
+```
+
+
+
+### Dia e Horário da Violência doméstica
+
+A tabela \@ref(tab:data-ocor-not) apresenta a distribuição da violência doméstica, por dia da semana de ocorrência e notificação. Assim, domingo é o dia com maior ocorrência de violência doméstica (17,0%), em seguida sábado com 13,8%. Por sua vez, sábado e domingo são os dias de menor notificação de violência doméstica, 8,8 e 10,2%. Portanto, os dias da semana com maior *ocorrência* são os dias de menor *notificação*. Segunda e terça são os dias de maior notificação 19,6 e 16,2%, respectivamente.
+
+
+```{r data-ocor-not, tab.cap="Distribuição do dia da semana de ocorrência e notificação", echo=FALSE}
+
+sinan |>
+  dplyr::filter(cs_sexo == "Mulher" & les_autop!="Sim" & ano_not %in% year & 
+                cs_raca == "Indígena" & grupo_viol == "Doméstica") |> droplevels() |>
+  #Mantém observações com data de ocorrência conhecidas.
+  select(dt_ocor) |> drop_na() |>
+   #Adiciona dia da semana.
+  mutate(
+    #Dia da Semana
+    wk_ocor = wday(dt_ocor, label = TRUE, abbr = FALSE), .keep = "none") |> 
+  tabyl(wk_ocor) |> adorn_pct_formatting() |> select(wk_ocor,percent) |> rename("Ocorrência" = percent) |>
+  left_join(x=_, y = 
+
+sinan |>
+  dplyr::filter(cs_sexo == "Mulher" & les_autop!="Sim" & ano_not %in% year & grupo_viol == "Doméstica") |> droplevels() |>
+  #Mantém observações com data de ocorrência conhecidas.
+  select(dt_notific) |> drop_na() |>
+   #Adiciona dia da semana.
+  mutate(
+    #Dia da Semana
+    wk_not = wday(dt_notific, label = TRUE, abbr = FALSE), .keep = "none") |> 
+  tabyl(wk_not) |> adorn_pct_formatting() |> select(wk_not,percent) |> rename("Notificação" = percent), by = join_by("wk_ocor" == "wk_not") ) |>
+  knitr::kable(format = "pipe")
+ 
+```
+
+
+Se a violência que acontece no fim de semana é notificada durante a semana, parece razoável supor que parcela das violências com ocorrência no sábado não são notificadas no domingo. A figura \@ref(fig:p-not-ocor) apresenta a proporção de notificações por dia da semana em relação ao dia da ocorrência. Por exemplo, 17,7% das ocorrências de quinta-feira são registradas na sexta-feira.
+
+
+Durante a semana, a proporção de notificações no dia da ocorrência é próxima a 60%, indicando que a maioria das violências são notificadas no mesmo dia. No entanto, durante o fim de semana, essa proporção cai para cerca de 50%. No domingo, a maioria das violências não são notificadas no próprio dia, enquanto no sábado, 51,2% das violências são notificadas no mesmo dia. Ainda assim, segunda feira registra 14,9% das violências com ocorrência no sábado, valor superior aos 8,1% registrados no domingo.
+
+Esses achados são importantes. A prevalência de notificações ao longo da semana sugere que parte das violências pode não ser notificada, independentemente da oferta de serviços de saúde. Essa dinâmica pode ser explicada pela natureza do atendimento médico e maior frequência de violências físicas. Após um tempo a dor física passa e a vítima não busca o serviço médico.
+
+```{r data-ocor-not2, echo=FALSE, eval=FALSE}
+
+sinan |>
+  dplyr::filter(cs_sexo == "Mulher" & les_autop!="Sim" & ano_not %in% year & 
+                  cs_raca == "Indígena" & grupo_viol == "Doméstica") |> droplevels() |>
+  #Mantém observações com data de ocorrência conhecidas.
+  select(dt_ocor,dt_notific) |> #drop_na() |> 
+  #Adiciona dia da semana.
+  mutate(
+    #Dia da Semana
+    wk_ocor = wday(dt_ocor, label = TRUE, abbr = FALSE),
+    wk_not  = wday(dt_notific,label = TRUE, abbr = FALSE), .keep = "none") |> 
+  tabyl(wk_ocor,wk_not) |> adorn_totals(where = c("row","col")) %>%
+  adorn_percentages(denominator = "row") %>% adorn_pct_formatting(digits = 1) %>%
+  adorn_ns(position = "front") |> adorn_title("combined", row_name = "Ocorrência", col_name = "Notificação")
+
+```
+
+
+```{r p-not-ocor, fig.cap = "Proporção das Notificações", out.height = "100%", out.width="100%", echo=FALSE}
+#Proporção das notificações por dia da semana.
+#A proproção das ocorrências no sábado notificadas ao longo da semana.
+sinan |>
+  dplyr::filter(cs_sexo == "Mulher" & les_autop!="Sim" & ano_not %in% year & 
+                cs_raca == "Indígena" &  grupo_viol == "Doméstica") |> droplevels() |>
+  #Mantém observações com data de ocorrência conhecidas.
+  select(dt_ocor,dt_notific) |> drop_na() |> #slice_sample(n = 10000) |>
+  #Adiciona dia da semana.
+  mutate(
+    #Dia da Semana
+    wk_ocor = wday(dt_ocor, label = TRUE, abbr = FALSE),
+    wk_not  = wday(dt_notific,label = TRUE, abbr = FALSE), .keep = "none") |> 
+  count(wk_ocor,wk_not, name = "n") |>
+  mutate(total = sum(n),
+         p_n = round( (n/total)*100,1), .by = wk_ocor) |>
+  select(wk_ocor,wk_not,p_n) -> data
+
+# Ordenar os dias da semana
+dias_ordem <- c("domingo", "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado")
+
+#dias_ordem <- c("dom", "seg", "ter", "qua", "qui", "sex", "sáb")
+
+ggplot(data, aes(x = factor(wk_not, levels = dias_ordem), y = p_n)) +
+  geom_line(aes(group = 1), linetype = "dotted") + geom_point() +
+  ggrepel::geom_text_repel(aes(label= p_n), size = 2.25) +
+  
+  scale_y_continuous(breaks = seq(0,80,20), labels = scales::label_percent(scale = 2) ) + 
+  facet_wrap(vars(wk_ocor) ) +
+  labs(title = "",
+       x = "Dia da Notificação",
+       y = "Proporção de notificação, por dia de ocorrência",
+       color = "Dia da Ocorrência") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 5),
+        axis.text.y = element_text(size = 5),
+        axis.title.x=element_text(size=8),axis.title.y=element_text(size=8) )
+rm(data,dias_ordem)
+
+```
+
+Qual a distância entre o dia de ocorrência e o dia de notificação?
+
+A nota de referência 36 diz que violências ocorridas mais de 5 anos antes do atendimento não deveriam entrar na base. No entanto, existem milhares de notificações ultrapassando o período de notificação recomendado. Algumas notificações são da década de 20. Também existem - são poucos - casos de data de notificação anteceder a data de ocorrência. A tabela \@ref(tab:data-dif-tab) apresenta estatísticas descritivas da distância entre dia de notificação e dia de ocorrência, ao considerar somente valores positivos e com até 5 anos de distância. Por fim, 81,7% das notificações acontecem em até uma semana da ocorrência.
+
+muitas notificações no primeiro dia do ano.
+
+
+```{r data-dif-tab, tab.cap= "data-dif", echo=FALSE}
+#Distância entre data de ocorrência e notificação.
+#Vou excluir notifcações com mais de cinco anos de ocorrência.
+sinan |>
+  dplyr::filter(
+   cs_sexo == "Mulher" & les_autop!="Sim" & ano_not %in% year & 
+   cs_raca == "Indígena" & grupo_viol == "Doméstica") |> droplevels() |>
+  
+  select(dt_ocor,dt_notific) |> drop_na() |> 
+  
+  #Diferença entre dia de ocorrência e notificação
+  mutate(data_dif = as.integer(dt_notific - dt_ocor) ) |> 
+  
+  #Existe notificação com data de ocorrência posterior a notificação! data_dif < 0
+  #Mantém notificações com até cinco anos de ocorrência. 1826 dias
+  filter(dplyr::between(data_dif,0, 1826) ) |>
+           
+    summarise("Média" = mean(data_dif),
+            "Mediana" = median(data_dif),
+            sd = sd(data_dif),
+            max = max(data_dif),
+            min = min(data_dif) ) |>
+  pivot_longer(cols = c(tidyselect::everything() ), names_to = "Metric") |> knitr::kable()
+
+```
+
+
+
+A figura \@ref(fig:dia-semana-hora-fig) apresenta a distribuição ao longo das horas, por dias da semana. 
+<!-- Considerar somente  distância entre ocorrência e notificação de 30 dias. Faz sentido período maior? -->
+
+
+```{r dia-semana-hora-fig, fig.cap = "Calendário", echo=FALSE}
+#Gráfico com distribuição das horas, por dia da semana
+sinan |>
+  dplyr::filter(cs_sexo == "Mulher" & les_autop!="Sim" & ano_not %in% year & 
+               cs_raca == "Indígena" &  grupo_viol == "Doméstica") |> droplevels() |>
+  select(hora_ocor,dt_ocor) |> drop_na() |> 
+  #Mantém somente combinações de data e hora conhecidas conhecidas.
+  mutate(
+    #Dia da Semana
+    wk_ocor = wday(dt_ocor,  label = TRUE, abbr = TRUE),
+    #Algumas horas de ocorrência estão com dígito errado.
+    hora_ocor = case_when(hora_ocor == "00000" ~ "00:00", .default = hora_ocor) |> as_factor(),
+    #Garantir que a coluna seja character
+    hora_ocor = as.character(hora_ocor),  
+    hora_ocor_intervalo = cut(
+      as.POSIXct(hora_ocor, format = "%H:%M"),
+      breaks = seq.POSIXt(as.POSIXct("00:00", format = "%H:%M"), as.POSIXct("24:00", format = "%H:%M"), by = "1 hour"),
+      labels = format(seq.POSIXt(as.POSIXct("00:00", format = "%H:%M"), as.POSIXct("23:30", format = "%H:%M"), by = "1 hour"), "%H:%M"),
+      include.lowest = TRUE,
+      right = TRUE ) ) |> 
+  #Contagem das notificações por hora e dia da semana.
+  count(wk_ocor,hora_ocor_intervalo) |> 
+  #Proporção por dia da semana.
+  mutate(p_h_ocor = round( (n/sum(n) )*100, 1), .by = wk_ocor) |> 
+  # Criar o gráfico de calor (heatmap) com proporção de ocorrências
+  ggplot( aes(x = hora_ocor_intervalo, y = wk_ocor, fill = p_h_ocor) ) +
+  geom_tile(color = "white") +
+  scale_fill_gradient(low = "white", high = "steelblue", labels = scales::label_percent(scale = 1) ) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1,size=6.5),
+        axis.text.y=element_text(size=6.5),axis.title.x=element_text(size=8),
+        axis.title.y=element_text(size=8),plot.title = element_text(size = 9),
+        legend.title=element_text(size=8),
+        legend.key = element_rect(fill = "transparent", colour = NA),
+        legend.background = element_rect(fill = "transparent", colour = NA) ) +
+  labs(title = "Proporção de violência doméstica por Hora e Dia da Semana", x = "Hora do Dia", y = "Dia da Semana", fill = "") -> p
+ggplotly(p)
+rm(p)
+```
+
+
+
+### Instrumento
+
+Instrumento utilizado na violência doméstica.
+
+```{r inst_conj, out.height = "100%", out.width="100%", echo=FALSE}
+library(plotly)
+sinan |>
+    dplyr::filter(cs_sexo == "Mulher" & les_autop!="Sim" & ano_not %in% year & 
+                  cs_raca == "Indígena" & !is.na(idade) & grupo_viol == "Doméstica" &
+          #Grupo de interesse na violência doméstica
+          nome_rel == "rel_conj") |> droplevels() |>
+     mutate(
+      #Transforma contagens pouco frequentes na categoria outros   
+      nome_instr = nome_instr |> fct_lump(prop = 0.005, other_level = "Outros"), 
+      #Transforma idade superior a 80 para 80.  
+      idade = case_when(idade >= 80 ~ 80, .default = idade) ) |> 
+    
+    #Contagem de tipo de violência por idade
+    count(idade,nome_instr, name = "n", .drop = FALSE) |> 
+    
+    mutate(
+    #Proporção da violência na idade
+    p_nome_instr = round( ( n/sum(n) )*100,1) , .by = c(idade) ) |>
+
+    #Gráfico
+    ggplot() +
+    geom_line( aes(x = idade, y = p_nome_instr, color = nome_instr ) ) + geom_point( aes(x = idade, y = p_nome_instr, color = nome_instr ) ) +
+    scale_x_continuous(breaks = seq(0,80,2) ) + scale_y_continuous(breaks = seq(0,100,5), labels = scales::label_percent(scale = 1) ) +
+    guides(color = guide_legend(position = "inside", ncol = 3) ) +
+    theme(legend.position.inside = c(0.75, 0.93),
+          axis.text.x=element_text(size=6.5),axis.text.y=element_text(size=6.5),
+          axis.title.x=element_text(size=8),axis.title.y=element_text(size=8),
+          plot.title = element_text(size = 9), legend.title=element_text(size=8),
+          legend.key = element_rect(fill = "transparent", colour = NA),
+          legend.background = element_rect(fill = "transparent", colour = NA) ) +
+    labs(x="Idade", y = "% de violência na Idade", color = "", title = "Instrumento da Violência doméstica x Provável autor - Cônjuge") -> p
+ggplotly(p)
+rm(p)
+
+```
+
+
+### Circunstância da Lesão
+
+Na ficha de notificação existe a variável "Circunstância da Lesão". De acordo com _[instrutivo notificação de violência interpessoal e autoprovocada](http://bvsms.saude.gov.br/bvs/publicacoes/viva_instrutivo_violencia_interpessoal_)_ do Ministério da Saúde:
+
+*esse campo se refere à classificação da causa e da circunstância da violência sofrida pela pessoa atendida/vítima e não à natureza da lesão. Utilizar os códigos do Capítulo XX, “Causas Externas de Morbidade e Mortalidade” (V01-Y98), da Classificação Internacional de Doenças e Problemas Relacionados à Saúde (CID-10).*
+
+A tabela \@ref(tab:circ-mis) apresenta a frequências das CIDs preenchidas. No caso de violência doméstica contra mulher, 62,3% das notificações estão com *missing value* em circunstância da lesão. Também existe elevada preenchimento com CIDs do capítulo XIX - natureza da lesão. Dentre as notificações com correto preenchimento, a CID indicada sugere agressão por meio de força corporal (Y04), força física (Y06) ou instrumento desconhecido (Y09), além de negligência e abandono (Y06). 
+
+Verificar se quando preenchida a variável circunstância da lesão repete a violência anotada na notificação. 
+
+```{r circ-mis, tab.cap = "Missing em circunstância da lesão",  echo=FALSE }
+
+sinan |>
+    dplyr::filter(cs_sexo == "Mulher" & les_autop!="Sim" & ano_not %in% year & 
+                  cs_raca == "Indígena" & grupo_viol == "Doméstica") |>
+    tabyl(circ_lesao) |> arrange(desc(n)) |> adorn_pct_formatting() |> kable(label = NA) |>
+  kable_styling("striped", full_width = F) %>% scroll_box(width = "900px", height = "700px") 
+
+```
+
+
+### Interseção entre provável autor e violência
+
+
+```{r esc-raca, fig.cap = "Interseção entre escolaridade e raça\\cor", echo=FALSE, eval=FALSE}
+
+sinan |>
+    dplyr::filter(cs_sexo == "Mulher" & les_autop!="Sim" & ano_not %in% year & 
+                  cs_raca == "Indígena" &  grupo_viol == "Doméstica") |>
+  mutate(
+    #Transforma contagens pouco frequentes na categoria outros   
+    nome_instr = nome_instr |> fct_lump(prop = 0.003, other_level = "Outros"), 
+    nome_rel = nome_rel |> fct_lump(prop = 0.005, other_level = "Outros") ) |>
+ tabyl(nome_instr,nome_rel)
+  
+
+```
+
+
+# Características das vítimas de violência doméstica.
+
+## Perfil da vítima de violência doméstica.
+
+A tabela \@ref(tab:perfil) apresenta o perfil da vítima de violência doméstica.
+
+```{r label = perfil, tab.cap = "Perfil da Vítima de violência doméstica.", echo= FALSE, message=FALSE, warning=FALSE }
+
+theme_gtsummary_language(language  = "pt", big.mark = ".",decimal.mark=",")
+# Tabela com perfil das vítimas de violência doméstica
+sinan |> 
+  
+  #Filtro de interesse.
+  dplyr::filter(cs_sexo == "Mulher" & les_autop!="Sim" & ano_not %in% year & 
+                cs_raca == "Indígena" & grupo_viol == "Doméstica") |> droplevels() |>
+  
+  #Reduzindo levels de provável autor.  
+  mutate(nome_rel = nome_rel |> fct_lump(prop = 0.005, other_level = "Outros"),
+         ocupa = ocupa |> fct_lump(prop = 0.001, other_level = "Outros") ) |>
+  
+  select(out_vezes, idade, cs_escol_n, cs_raca, sit_conjug, nome_rel, autor_alco, viol_motiv, cs_gestant, orient_sex, ident_gen) |>
+  
+  tbl_summary(
+    by = out_vezes,
+    # don't list missing data separately
+    missing = "no",
+    #Alterando o label das variáveis 
+    label = list(idade ~ "Idade", cs_escol_n ~ "Escolaridade", cs_raca ~ "Raça\\Cor",
+                 sit_conjug = "Situação Conjugal", nome_rel ~ "Provável Autor", 
+                 autor_alco ~ "Provável autor com suspeita de álcool", viol_motiv ~ "Motivação da Violência", 
+                 cs_gestant ~ "Idade Gestacional",  orient_sex ~ "Orientação Sexual", ident_gen ~ "Identidade de Gênero"),
+    
+    type = all_continuous() ~ "continuous2",
+    #Alterando estatísticas utilizadas
+    statistic = all_continuous() ~ c(
+      "{N_nonmiss} ({p_nonmiss}%)",
+      "{N_miss} ({p_miss}%)",
+      "{mean} ({sd})",
+      "{median} ({p25}, {p75})",
+      "{min} - {max}"),
+    
+    #Alterando número de dígitos em cada linha das estatísticas de idade.
+    digits = list(idade ~ c(0,1,0,1,1,1,1,1,0,0) ) ) |>
+  
+  #Alterando label das estatísticas de idade.
+  add_stat_label(label = idade ~ c("N(%)", "N faltante (%)", "Média (SD)", "Mediana (IQR)", "Min - Max")) |>
+  
+  #Alterando header da tabela
+  modify_spanning_header(c("stat_1","stat_2","stat_3","stat_4") ~ "**Informar se a violência é de repetição**") %>%
+  #
+  modify_header(label = "**Características**",   # update the column header
+                #Alterando as estatísticas dos totais apresentados no topo da tabela.
+                all_stat_cols() ~ "**{level}** N = {style_number(n, big.mark = '.', decimal.mark = ',')} ({style_percent(p,digits = 1)}%)") |>
+  bold_labels() %>%  kable(label = NA) %>%
+  kable_styling("striped", full_width = F) %>% scroll_box(width = "1000px", height = "700px")
+
+```
+
+
+
+Idade da vítima 
+
+A figura \@ref(fig:idade-acum) apresenta a distribuição xxx.
+
+
+```{r idade-acum, fig.cap = "Distribuição acumulada da idade de vítimas de violência doméstica", echo=FALSE, fig.topcaption=TRUE , out.height = "100%", out.width="100%"}
+
+sinan |> 
+  filter(cs_sexo == "Mulher" & les_autop!="Sim" & grupo_viol == "Doméstica" & ano_not %in% year &
+         cs_raca == "Indígena" & !is.na(idade) ) |>
+  
+  mutate(
+    #Transforma idade superior a 80 para 80.  
+    idade = case_when(idade >= 85 ~ 85, .default = idade) ) |> 
+  
+  ggplot(aes(x=idade, color = cs_raca)) +
+  
+  stat_ecdf(pad = FALSE, geom = "step", show.legend = FALSE) + 
+  
+  #linha nos 50%
+  geom_hline(yintercept = 0.5, linetype = "dashed", color = "black") +
+   
+  facet_wrap(vars(cs_raca), scales = "free_x") +
+  
+  labs(x = "Idade", y="") +
+  
+  scale_x_continuous(breaks = seq(0, 85, 5) ) + 
+ 
+  scale_y_continuous(labels = scales::percent, breaks = seq(0,1,0.1)) + 
+  
+  theme(
+        strip.text = element_text(size = 10, margin = margin(), face = "bold"),
+    
+        axis.text.y = element_text(size = 6),
+        axis.text.x = element_text(size = 6),
+        axis.title.x = element_text(size = 8.5, face = "bold") ) 
+
+```
+
+
+
+## Característias dos resultados do mercado de trabalho.
+
+
+```{r echo=FALSE}
+#Remove base SINAN 
+rm(list = ls())
+#Importa join SINAN e RAIS.
+load("C:/Users/gabli/Desktop/r/Sinan/sinan_rais.RData")
+```
+
+
+
+Essa seção apresenta as características de mercado de trabalho das mulheres vítimas de violência doméstica. As características são resgatadas através de join entre o SINAN e a Relação Anual de Informações Sociais (RAIS). O join considera vítimas a partir dos 15 anos de idade e residêntes na cidade do Rio de Janeiro e realiza a correspondência entre idade, ocupação, escolaridade e município de residência. Não são consideradas vítimas com valores *missing* nas variáveis utilizados no join.
+Ao final do join são 119 vítimas.
+
+
+A figura \@ref(fig:distr-rend) apresenta a distribuição acumulada da remuneração média. Conforme observado, o rendimento de até 50% das vítimas de violência doméstica é de R$1.439,04.
+
+```{r distr-rend, fig.cap= "Distribuição Cumulativa dos Rendimentos.",out.height = "100%", out.width="100%", echo=FALSE}
+base |>
+ggplot(aes(x = rem_media_reais)) +
+  stat_ecdf(geom = "step", color = "blue") +  # Curva de distribuição cumulativa
+  geom_vline(xintercept = median(base$rem_media_reais), color = "red", linetype = "dashed") +  # Linha vertical na mediana
+  scale_x_continuous( breaks = seq(500,3250,250) ) +
+  scale_y_continuous(labels = scales::label_percent() ) +
+  annotate("text", x = 2100, y = 0.5, label = paste("Mediana =", median(base$rem_media_reais), "reais"), 
+           color = "red", vjust = -0.5) +  # Texto indicando o valor da mediana
+  labs(
+    x = "Remuneração Média",
+    y = "Proporção acumulada")
+
+```
+
+
+```{r label = 'hist-rend', fig.cap= "Histograma dos Rendimentos.", echo=FALSE, out.height = "100%", out.width="100%",}
+#Histograma.
+base |>
+  ggplot( aes(x = rem_media_reais) ) +
+  geom_histogram(binwidth = 100, fill = "skyblue", color = "black", alpha = 0.7) +
+  geom_vline(xintercept = median(base$rem_media_reais), color = "red", linetype = "dashed") +
+  annotate("text", x =  median(base$rem_media_reais), y = max(table(cut(base$rem_media_reais, breaks = 20)))*0.9, 
+            label = paste("Mediana =",  median(base$rem_media_reais), "reais"), color = "red", hjust = -0.1) +
+  scale_x_continuous( breaks = seq(500,3250,250) ) +
+  labs(x = "Remuneração Média", y = "Frequência")
+
+```
+
+Na tabela \@ref(tab:cnae-ocupa) frequência por remuneração média.
+
+```{r label = 'cnae-ocupa', tab.cap="Atividade Econômica(CNAE) x Ocupação (CBO) ", echo = FALSE}
+
+base |> 
+  tabyl(atv_grupo_cnae,ocupa, show_missing_levels = FALSE) |> adorn_totals(where = c("row","col")) %>%
+  adorn_percentages(denominator = "col") |> adorn_pct_formatting(digits = 1) %>%
+  adorn_ns(position = "front",format_func = function(x) format(x, big.mark = ".",decimal.mark = ",") ) |>
+  adorn_title(row_name = "Atividade Econômica(CNAE)", col_name = "Ocupação (CBO)") |> kable(label = NA) |>
+  kable_styling("striped", full_width = F) %>% scroll_box(width = "1000px", height = "700px") 
+
+```
+
+
+Potencialidades da base SINAN identificada.
+
+Na base identificada será possível investigar o tipo de vínculo (CLT, PJ, servidor público).
+Causa do afastamento, dias afastado e razão do afastamento. Já existe a variável quantidade de dias afastado (qt_dias_afast)
+
+Paper investigando causalidade entre violência doméstica e quantidade de dias afastados.
+
+
+```{r echo=FALSE}
+rm(list = ls())
+
+load("C:/Users/gabli/Desktop/r/Sinan/sinan_14_22.RData")
+year <- c(2015:2022)
+age <- c(15:59)
+```
+
+### Ocupação da vítima
+Qual a ocupação da vítima de violência doméstica?
+
+Observamos na tabela \@ref(tab:ocup) que a variável ocupação da vítima apresenta elevado Missing. Dentre as observações com ocupação conhecida, existe elevada ocorrência de vítimas com trabalho braçal. 
+
+
+```{r ocup, tab.cap = "Ocupação das vítimas de violência doméstica", echo=FALSE}
+#Tabela com distribuição das vítimas de violência doméstica.
+
+sinan |>
+  dplyr::filter(cs_sexo == "Mulher" & les_autop!="Sim" & ano_not %in% year & 
+                cs_raca == "Indígena" & grupo_viol == "Doméstica") |> droplevels() |>
+  tabyl(ocupa) |> adorn_pct_formatting() |> arrange(desc(n)) |> kable(label = NA) %>%
+  kable_styling("striped", full_width = F) %>% scroll_box(width = "900px", height = "700px") 
+
+
+```
+
+
+### Grávidez
+
+tabela \@ref(tab:gest) apresenta a distribuição da idade gestacional de vítimas de violência doméstica. 
+
+```{r gest, tab.cap = "Gravidez", echo = FALSE }
+#A vitimada estava grávida?
+sinan |>
+  dplyr::filter(cs_sexo == "Mulher" & les_autop!="Sim" & ano_not %in% year & 
+               cs_raca == "Indígena" & grupo_viol == "Doméstica") |> droplevels() |>
+  tabyl(cs_gestant) |> adorn_pct_formatting() |> knitr::kable()
+```
+
