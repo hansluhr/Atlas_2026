@@ -4,23 +4,38 @@ library(janitor)
 
 #Join da base recente de homicídios ocultos com a última base
 #Base com homicídios ocultos utilizada no atlas
-load("C:/Users/gabli/Desktop/r/SIM/bases_ocultos/homic_preds.RData")
-homic_preds_96_22 <- homic_preds
+load(paste0(dirname(getwd()),"/bases/homic_oculto/homic_preds_96_23.RData"))
+homic_preds_96_23 <- homic_preds
 #Mantém somente data frame dos homic_preds
-rm(sim_doext,homic_preds)
+rm(list = setdiff(ls(),"homic_preds_96_23"))
+
+
+#Eu alterei o nome das variáveis com label, adicionei o prefixo (def_).
+#Para realizar o bind, será necessário realizar rename das variáveis na base antiga
+homic_preds_96_23 <- homic_preds_96_23 |>
+  rename(def_sexo = sexo, def_racacor = racacor, def_estciv = estciv,
+         def_esc = esc, local_incd = local_obito,
+         codmunresd = codmunres, def_uf_resd = uf_resd, 
+         def_uf_ocor = uf_ocor, .pred_Homicídio = .pred_homic) |>
+  #Compatibilização de tipos
+  mutate(mes = factor(mes, ordered = FALSE),
+         dia = factor(dia, ordered = FALSE),
+         across(.cols = c(cod_uf_resd,cod_uf_ocor), 
+                .fns = ~ as_factor(.) ) )
 
 #Importação dos homicídios ocultos de 2023
-load("C:/Users/gabli/Desktop/r/SIM/bases_ocultos/homic_preds_96_23.RData")
-rm(rf_fit,w_rfxgb,base_new,base_old)
+load(paste0(dirname(getwd()),"/bases/homic_oculto/homic_preds_96_24.RData"))
+rm(list = setdiff(ls(),c("homic_preds_96_23","homic_preds")))
 
 #Join base recente de homicídios ocultos e base histórica de homicídios ocultos.
 homic_preds |>
   #Mantém último ano
-  filter(ano == 2023) |>
+  filter(ano == 2024) |>
   #Join com base histórica de homicídios ocultos.
-  bind_rows(homic_preds_96_22) -> homic_preds 
-rm(homic_preds_96_22)  
-gc()
+  bind_rows(homic_preds_96_23) |>
+  #Exclusão de variáveis não utilizadas quando estimei a base new. O ideal é considerar todas as variáveis.
+  select(!c(dtobito,causabas,causa_letra,causa_num,reg_ocor,reg_resd) ) -> homic_preds 
+rm(homic_preds_96_23); gc()
 
 
 #Mantém os seis primeiros dígitos no código do município
@@ -83,7 +98,7 @@ homic_preds <-
 
 
 #Salvando base com todos os períodos
-save.image("C:/Users/gabli/Desktop/r/SIM/Atlas 2025/sim_doext_homic_pred_96_23.RData")
+save.image(paste0(dirname(getwd()),"/bases/homic_oculto/sim_doext_homic_pred_96_24.RData") )
 
 homic_preds |>
   count(ano,.pred_class) |> view()
