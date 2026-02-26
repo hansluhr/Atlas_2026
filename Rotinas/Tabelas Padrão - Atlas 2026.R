@@ -569,7 +569,7 @@ base |> select(ano,def_uf_resd, tx_homic) |>
   mutate(across(where(is.numeric), ~ str_replace_all(as.character(.), "\\.", ","))) %>%
   #Nota de rodapé
   add_row(
-    def_uf_resd = "Fonte: IBGE - Projeções da População do Brasil e Unidades da Federação por sexo e idade: 2010-2060 e MS/SVSA/CGIAE - Sistema de Informações sobre Mortalidade - SIM. Elaboração: Diest/Ipea e FBSP. Nota: O número de homicídios na UF de residência foi obtido pela soma das seguintes CIDs 10: X85-Y09 e Y35 - Y36, ou seja, óbitos causados por agressão, intervenção legal e operações de guerra. O número de óbitos e da população foi obtido pela soma de indivíduos de 0 a 4 anos de idade.") |>
+    def_uf_resd = "Fonte: IBGE - Projeções da População do Brasil e Unidades da Federação por sexo e idade: 2000-2070 e MS/SVSA/CGIAE - Sistema de Informações sobre Mortalidade - SIM. Elaboração: Diest/Ipea e FBSP. Nota: O número de homicídios na UF de residência foi obtido pela soma das seguintes CIDs 10: X85-Y09 e Y35 - Y36, ou seja, óbitos causados por agressão, intervenção legal e operações de guerra. O número de óbitos e da população foi obtido pela soma de indivíduos de 0 a 4 anos de idade.") |>
   #Título da Tabela
   adorn_title(placement = "top", row_name = "",
               col_name = glue::glue("Taxa de homicídios registrados de infantes (0 a 4 anos), por UF {min(year)}–{max(year)}") ) |>
@@ -578,4 +578,964 @@ base |> select(ano,def_uf_resd, tx_homic) |>
 
 
 
+
+# Homicídio de criança 5 a 14 por ano e UF ---------------------------------------------
+library(tidyverse)
+library(janitor)
+#Pasta raiz
+here::i_am("Rotinas/Tabelas Padrão - Atlas 2026.R") 
+#Importação base de interesse
+load(paste0(dirname(getwd()),"/bases/sim/RData/sim_doext_14_24.Rdata"))
+year <- c(2014:2024)
+fxet <- c(5:14)
+
+#Carregando base populacional. Microdado RIPSA.
+load( paste0(dirname(getwd()),"/bases/populacao/ripsa/pop_ripsa.Rdata") ) 
+pop <- pop |> 
+  #Código do município com seis dígitos
+  mutate(cod_mun = substr(cod_mun, 1, 2),
+         idade = idade |> as.character() |> as.integer(),
+         def_uf_resd = recode_values(as.character(cod_mun),
+                                     "11" ~ "Rondônia",
+                                     "12" ~ "Acre",
+                                     "13" ~ "Amazonas",
+                                     "14" ~ "Roraima",
+                                     "15" ~ "Pará",
+                                     "16" ~ "Amapá",
+                                     "17" ~ "Tocantins",
+                                     "21" ~ "Maranhão",
+                                     "22" ~ "Piauí",
+                                     "23" ~ "Ceará",
+                                     "24" ~ "Rio Grande do Norte",
+                                     "25" ~ "Paraíba",
+                                     "26" ~ "Pernambuco",
+                                     "27" ~ "Alagoas",
+                                     "28" ~ "Sergipe",
+                                     "29" ~ "Bahia",
+                                     "31" ~ "Minas Gerais",
+                                     "32" ~ "Espírito Santo",
+                                     "33" ~ "Rio de Janeiro",
+                                     "35" ~ "São Paulo",
+                                     "41" ~ "Paraná",
+                                     "42" ~ "Santa Catarina",
+                                     "43" ~ "Rio Grande do Sul",
+                                     "50" ~ "Mato Grosso do Sul",
+                                     "51" ~ "Mato Grosso",
+                                     "52" ~ "Goiás",
+                                     "53" ~ "Distrito Federal",
+                                     default = NA_character_) ) |>
+  #Nome padrão.
+  rename(cod_uf_resd = cod_mun) |>
+  #Matém idade e anos de interesse
+  filter(idade %in% fxet & ano %in% year) |>
   
+  #Variáveis não utilizadas
+  select(!c(sexo,idade) ) |>
+  #Somatório das idades para encontra a faixa etária desejada.
+  summarise(pop_inf5_14 = sum(pop), .by = c(cod_uf_resd,def_uf_resd,ano) )
+
+
+#Tabela com homicídios infatil 0 a 4. 
+sim_doext |> filter(intencao_homic == "Homicídio" & idade %in% fxet) |>
+  #Contagem pela UF DE RESIDÊNCIA
+  count(def_uf_resd, cod_uf_resd, ano, .drop = FALSE, name = "homic") -> homic_inf5_14
+
+
+#Join entre população infatil e homicídio infantil
+left_join(pop,homic_inf5_14, by = join_by("cod_uf_resd","def_uf_resd","ano") ) -> base
+rm(homic_inf5_14, pop)  
+
+#Acrescentando total Brasil e criando taxa
+base |>
+  #Adiciona zero, quando não ocorre homicídio no ano, uf e idade de interesse
+  mutate(homic = replace_na(homic,0) ) %>%
+  bind_rows(. |>
+              summarise(def_uf_resd="Brasil" ,
+                        pop_inf5_14 = sum(pop_inf5_14),
+                        homic = sum(homic, na.rm = TRUE), .by=ano) ) |> 
+  #Taxa de homicídio. Padrão Atlas. A taxa somente com uma casa decimal.
+  mutate(tx_homic = format(round((homic/pop_inf5_14)*100000,digits = 1) ) |> as.double() ) -> base
+
+
+#Tabela formato wide do número de homicídios de infantes 0 a 4 anos.
+base |> select(ano,def_uf_resd, homic) |>
+  pivot_wider(names_from = ano, values_from =  homic) %>%
+  #Variações
+  mutate(
+    #Anual
+    "{names(.)[ncol(.)-1]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[ncol(.)-1]]) / .[[ncol(.)-1]] * 100, 1), decimal.mark = ","), 
+    
+    #Cinco anos
+    "{names(.)[7]} a {names(.)[ncol(.)]} " := 
+      format(round((.[[ncol(.)]] - .[[7]]) / .[[7]] * 100, 1), decimal.mark = ","),
+    
+    #Dez anos 
+    "{names(.)[2]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[2]]) / .[[2]] * 100, 1), decimal.mark = ",") )  |>
+  
+  #Ordenando a linha da tabela seguindo o padrão Atlas.
+  slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
+                "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
+                "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
+                "Sergipe","Tocantins"),def_uf_resd) ) |>
+  # Converte as colunas numéricas para caracteres e substitui pontos por vírgulas.
+  #Assim fica mais fácil converter para numérico no excel.
+  mutate(across(where(is.numeric), ~ str_replace_all(as.character(.), "\\.", ","))) %>%
+  #Nota de rodapé
+  add_row(
+    def_uf_resd = "Fonte: MS/SVSA/CGIAE - Sistema de Informações sobre Mortalidade - SIM. Elaboração: Diest/Ipea e FBSP. Nota: O número de homicídios na UF de residência foi obtido pela soma das seguintes CIDs 10: X85-Y09 e Y35 - Y36, ou seja, óbitos causados por agressão, intervenção legal e operações de guerra. O número de óbitos foi obtido pela soma de indivíduos de 5 a 14 anos de idade.") |>
+  #Título da Tabela
+  adorn_title(placement = "top", row_name = "",
+              col_name = glue::glue("Número de homicídios registrados de infantes (5 a 14 anos), por UF {min(year)}–{max(year)}") ) |>
+  #Exportando tabela.
+  rio::export(x= _ ,"base/n_homicidio_infatil5_14_uf_br.xlsx")
+
+
+#Tabela formato wide da taxa de homicídios de infantes 0 a 4 anos.
+base |> select(ano,def_uf_resd, tx_homic) |>
+  pivot_wider(names_from = ano, values_from =  tx_homic) %>%
+  #Variações
+  mutate(
+    
+    #Anual
+    "{names(.)[ncol(.)-1]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[ncol(.)-1]]) / .[[ncol(.)-1]] * 100, 1), decimal.mark = ","), 
+    
+    #Cinco anos
+    "{names(.)[7]} a {names(.)[ncol(.)]} " := 
+      format(round((.[[ncol(.)]] - .[[7]]) / .[[7]] * 100, 1), decimal.mark = ","),
+    
+    #Dez anos 
+    "{names(.)[2]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[2]]) / .[[2]] * 100, 1), decimal.mark = ",") )  |>
+  
+  #Ordenando a linha da tabela seguindo o padrão Atlas.
+  slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
+                "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
+                "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
+                "Sergipe","Tocantins"), def_uf_resd) ) |>
+  # Converte as colunas numéricas para caracteres e substitui pontos por vírgulas.
+  #Assim fica mais fácil converter para numérico no excel.
+  mutate(across(where(is.numeric), ~ str_replace_all(as.character(.), "\\.", ","))) %>%
+  #Nota de rodapé
+  add_row(
+    def_uf_resd = "Fonte: IBGE - Projeções da População do Brasil e Unidades da Federação por sexo e idade: 2000-2070 e MS/SVSA/CGIAE - Sistema de Informações sobre Mortalidade - SIM. Elaboração: Diest/Ipea e FBSP. Nota: O número de homicídios na UF de residência foi obtido pela soma das seguintes CIDs 10: X85-Y09 e Y35 - Y36, ou seja, óbitos causados por agressão, intervenção legal e operações de guerra. O número de óbitos e da população foi obtido pela soma de indivíduos de 5 a 14 anos de idade.") |>
+  #Título da Tabela
+  adorn_title(placement = "top", row_name = "",
+              col_name = glue::glue("Taxa de homicídios registrados de infantes (5 a 14 anos), por UF {min(year)}–{max(year)}") ) |>
+  #Exportando tabela.
+  rio::export(x = _ ,"base/taxa_homicidio_infantil5_14_uf_br.xlsx")
+
+
+rm(list = ls()); gc()
+
+
+# Homicídio adolescente 15 a 19 -------------------------------------------
+library(tidyverse)
+library(janitor)
+#Pasta raiz
+here::i_am("Rotinas/Tabelas Padrão - Atlas 2026.R") 
+#Importação base de interesse
+load(paste0(dirname(getwd()),"/bases/sim/RData/sim_doext_14_24.Rdata"))
+year <- c(2014:2024)
+fxet <- c(15:19)
+
+#Carregando base populacional. Microdado RIPSA.
+load( paste0(dirname(getwd()),"/bases/populacao/ripsa/pop_ripsa.Rdata") ) 
+pop <- pop |> 
+  #Código do município com seis dígitos
+  mutate(cod_mun = substr(cod_mun, 1, 2),
+         idade = idade |> as.character() |> as.integer(),
+         def_uf_resd = recode_values(as.character(cod_mun),
+                                     "11" ~ "Rondônia",
+                                     "12" ~ "Acre",
+                                     "13" ~ "Amazonas",
+                                     "14" ~ "Roraima",
+                                     "15" ~ "Pará",
+                                     "16" ~ "Amapá",
+                                     "17" ~ "Tocantins",
+                                     "21" ~ "Maranhão",
+                                     "22" ~ "Piauí",
+                                     "23" ~ "Ceará",
+                                     "24" ~ "Rio Grande do Norte",
+                                     "25" ~ "Paraíba",
+                                     "26" ~ "Pernambuco",
+                                     "27" ~ "Alagoas",
+                                     "28" ~ "Sergipe",
+                                     "29" ~ "Bahia",
+                                     "31" ~ "Minas Gerais",
+                                     "32" ~ "Espírito Santo",
+                                     "33" ~ "Rio de Janeiro",
+                                     "35" ~ "São Paulo",
+                                     "41" ~ "Paraná",
+                                     "42" ~ "Santa Catarina",
+                                     "43" ~ "Rio Grande do Sul",
+                                     "50" ~ "Mato Grosso do Sul",
+                                     "51" ~ "Mato Grosso",
+                                     "52" ~ "Goiás",
+                                     "53" ~ "Distrito Federal",
+                                     default = NA_character_) ) |>
+  #Nome padrão.
+  rename(cod_uf_resd = cod_mun) |>
+  #Matém idade e anos de interesse
+  filter(idade %in% fxet & ano %in% year) |>
+  
+  #Variáveis não utilizadas
+  select(!c(sexo,idade) ) |>
+  #Somatório das idades para encontra a faixa etária desejada.
+  summarise(pop_inf15_19 = sum(pop), .by = c(cod_uf_resd,def_uf_resd,ano) )
+
+
+#Tabela com homicídios infatil 0 a 4. 
+sim_doext |> filter(intencao_homic == "Homicídio" & idade %in% fxet) |>
+  #Contagem pela UF DE RESIDÊNCIA
+  count(def_uf_resd, cod_uf_resd, ano, .drop = FALSE, name = "homic") -> homic_inf15_19
+
+
+#Join entre população infatil e homicídio infantil
+left_join(pop,homic_inf15_19, by = join_by("cod_uf_resd","def_uf_resd","ano") ) -> base
+rm(homic_inf15_19, pop)  
+
+#Acrescentando total Brasil e criando taxa
+base |>
+  #Adiciona zero, quando não ocorre homicídio no ano, uf e idade de interesse
+  mutate(homic = replace_na(homic,0) ) %>%
+  bind_rows(. |>
+              summarise(def_uf_resd="Brasil" ,
+                        pop_inf15_19 = sum(pop_inf15_19),
+                        homic = sum(homic, na.rm = TRUE), .by=ano) ) |> 
+  #Taxa de homicídio. Padrão Atlas. A taxa somente com uma casa decimal.
+  mutate(tx_homic = format(round((homic/pop_inf15_19)*100000,digits = 1) ) |> as.double() ) -> base
+
+
+#Tabela formato wide do número de homicídios de infantes 0 a 4 anos.
+base |> select(ano,def_uf_resd, homic) |>
+  pivot_wider(names_from = ano, values_from =  homic) %>%
+  #Variações
+  mutate(
+    #Anual
+    "{names(.)[ncol(.)-1]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[ncol(.)-1]]) / .[[ncol(.)-1]] * 100, 1), decimal.mark = ","), 
+    
+    #Cinco anos
+    "{names(.)[7]} a {names(.)[ncol(.)]} " := 
+      format(round((.[[ncol(.)]] - .[[7]]) / .[[7]] * 100, 1), decimal.mark = ","),
+    
+    #Dez anos 
+    "{names(.)[2]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[2]]) / .[[2]] * 100, 1), decimal.mark = ",") )  |>
+  
+  #Ordenando a linha da tabela seguindo o padrão Atlas.
+  slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
+                "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
+                "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
+                "Sergipe","Tocantins"),def_uf_resd) ) |>
+  # Converte as colunas numéricas para caracteres e substitui pontos por vírgulas.
+  #Assim fica mais fácil converter para numérico no excel.
+  mutate(across(where(is.numeric), ~ str_replace_all(as.character(.), "\\.", ","))) %>%
+  #Nota de rodapé
+  add_row(
+    def_uf_resd = "Fonte: MS/SVSA/CGIAE - Sistema de Informações sobre Mortalidade - SIM. Elaboração: Diest/Ipea e FBSP. Nota: O número de homicídios na UF de residência foi obtido pela soma das seguintes CIDs 10: X85-Y09 e Y35 - Y36, ou seja, óbitos causados por agressão, intervenção legal e operações de guerra. O número de óbitos foi obtido pela soma de indivíduos de 15 a 19 anos de idade.") |>
+  #Título da Tabela
+  adorn_title(placement = "top", row_name = "",
+              col_name = glue::glue("Número de homicídios registrados de infantes (15 a 19 anos), por UF {min(year)}–{max(year)}") ) |>
+  #Exportando tabela.
+  rio::export(x= _ ,"base/n_homicidio_infatil15_19_uf_br.xlsx")
+
+
+#Tabela formato wide da taxa de homicídios de infantes 0 a 4 anos.
+base |> select(ano,def_uf_resd, tx_homic) |>
+  pivot_wider(names_from = ano, values_from =  tx_homic) %>%
+  #Variações
+  mutate(
+    
+    #Anual
+    "{names(.)[ncol(.)-1]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[ncol(.)-1]]) / .[[ncol(.)-1]] * 100, 1), decimal.mark = ","), 
+    
+    #Cinco anos
+    "{names(.)[7]} a {names(.)[ncol(.)]} " := 
+      format(round((.[[ncol(.)]] - .[[7]]) / .[[7]] * 100, 1), decimal.mark = ","),
+    
+    #Dez anos 
+    "{names(.)[2]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[2]]) / .[[2]] * 100, 1), decimal.mark = ",") )  |>
+  
+  #Ordenando a linha da tabela seguindo o padrão Atlas.
+  slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
+                "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
+                "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
+                "Sergipe","Tocantins"), def_uf_resd) ) |>
+  # Converte as colunas numéricas para caracteres e substitui pontos por vírgulas.
+  #Assim fica mais fácil converter para numérico no excel.
+  mutate(across(where(is.numeric), ~ str_replace_all(as.character(.), "\\.", ","))) %>%
+  #Nota de rodapé
+  add_row(
+    def_uf_resd = "Fonte: IBGE - Projeções da População do Brasil e Unidades da Federação por sexo e idade: 2000-2070 e MS/SVSA/CGIAE - Sistema de Informações sobre Mortalidade - SIM. Elaboração: Diest/Ipea e FBSP. Nota: O número de homicídios na UF de residência foi obtido pela soma das seguintes CIDs 10: X85-Y09 e Y35 - Y36, ou seja, óbitos causados por agressão, intervenção legal e operações de guerra. O número de óbitos e da população foi obtido pela soma de indivíduos de 15 a 19 anos de idade.") |>
+  #Título da Tabela
+  adorn_title(placement = "top", row_name = "",
+              col_name = glue::glue("Taxa de homicídios registrados de infantes (15 a 19 anos), por UF {min(year)}–{max(year)}") ) |>
+  #Exportando tabela.
+  rio::export(x = _ ,"base/taxa_homicidio_infantil15_19_uf_br.xlsx")
+
+rm(list = ls()); gc()
+
+
+
+# Instrumento de óbito de infantes, crianças e adolescentes ---------------
+library(tidyverse)
+library(janitor)
+#Pasta raiz
+here::i_am("Rotinas/Tabelas Padrão - Atlas 2026.R") 
+#Importação base de interesse
+load(paste0(dirname(getwd()),"/bases/sim/RData/sim_doext_14_24.Rdata"))
+year <- c(2014:2024)
+
+
+sim_doext |> 
+  
+  filter(ano %in% year) |>
+  
+  #Base sim extraida do duckdb
+  mutate(idade = idade |> as.integer() ) |>
+  
+  
+  #Adiciona faixa etária de interesse
+  mutate(fxet = case_when(
+    between(idade, 0, 4) ~ "Infantes (0 a 4 anos)", 
+    between(idade, 5, 14) ~ "Crianças (5 a 14 anos)",
+    between(idade, 15, 19) ~ "Adolescentes (15 a 19 anos)", .default = "Restante") |> as_factor() |>
+      
+      #Ordem dos Levels da faixa etária
+      fct_relevel("Infantes (0 a 4 anos)", 
+                  "Crianças (5 a 14 anos)",
+                  "Adolescentes (15 a 19 anos)") ) |> 
+  #Ordem dos levels de instrumento
+  mutate(instrumento = instrumento |> 
+           fct_relevel("PAF", "Perfurante", "Desconhecido", "Contundente", "Enforcamento",
+                       "Fogo", "Afogamento", "Veículo", "Envenenamento", "Impacto" ) ) |>
+  #Mantém somente homicídios e exclui faixa etária sem interesse.
+  filter(fxet != "Restante" & intencao_homic == "Homicídio") |> droplevels() |>
+  
+  tabyl(instrumento,fxet) %>% adorn_totals(where = c("row","col")) %>%
+  adorn_percentages(denominator  = "col") %>% adorn_pct_formatting(digits = 1) %>%
+  adorn_ns(position = "front",  format_func = function(x) { format(x, big.mark = ".", decimal.mark = ",") } ) |>
+
+  rio::export(x = _, "base/instrumento_eca.xlsx")
+
+
+# Homicídio Mulheres ------------------------------------------------------
+library(tidyverse)
+library(janitor)
+#Pasta raiz
+here::i_am("Rotinas/Tabelas Padrão - Atlas 2026.R") 
+#Importação base de interesse
+load(paste0(dirname(getwd()),"/bases/sim/RData/sim_doext_14_24.Rdata"))
+year <- c(2014:2024)
+
+
+#Contagem de homicídios registrados, por ano e UF
+sim_doext |> 
+  #Filtro das intenções de interesse.
+  filter(intencao_homic  == "Homicídio" & def_sexo == "Mulher") |>
+  #Poderia adcionar total brasil. Mas precisa adicionar brasil na pop. Vou acrescentar Brasil após juntas as bases.
+  count(ano,cod_uf_resd,def_uf_resd, name = "homicidio") |>
+  mutate(cod_uf_resd = cod_uf_resd |> as.integer() ) -> homic
+
+##Importando população.
+#Caminho do excel com pnadc geral
+excel_pnadc <- paste0(dirname(getwd()),"/bases/populacao/Pop_Geral_UFs_PNADc.xlsx")
+
+#Importação e empilhando os últimos dez anos da PNADc
+pop_pnadc <- map_dfr(
+  #Tail informa que desejamos os últimos dez anos da pnadc
+  .x = tail(readxl::excel_sheets(excel_pnadc), 11),
+  
+  ~ readxl::read_excel(path = excel_pnadc, sheet = .x) ) |>
+  
+  #Selecionando população mulher
+  select(uf = UF,ano, pop = PoP.Mulher)
+rm(excel_pnadc)
+
+#Tratamento base com população PNADc
+pop_pnadc |> 
+  #Excluindo as regiões. Não utilizado
+  filter(!(uf %in% c("Norte","Centro Oeste","Nordeste","Sudeste","Sul"))) |>
+  #Incluindo código das UFs
+  mutate(cod_ibge = recode(uf, "Rondônia" = 11,"Acre" = 12, "Amazonas" = 13, "Roraima" = 14, "Pará" = 15, "Amapá" = 16,
+                           "Maranhão" = 21, "Piauí" = 22, "Ceará" = 23, "Rio Grande do Norte" = 24, "Paraíba" = 25, 
+                           "Pernambuco" = 26, "Alagoas" = 27, "Sergipe" = 28, "Bahia" = 29, "Minas Gerais" = 31,
+                           "Espírito Santo" = 32, "Rio de Janeiro" = 33, "São Paulo" = 35, "Paraná" = 41, "Santa Catarina" = 42,
+                           "Rio Grande do Sul" = 43, "Mato Grosso do Sul" = 50, "Mato Grosso" = 51, "Goiás" = 52,
+                           "Distrito Federal" = 53, "Tocantins" = 17), .before=uf,
+         #Transofrmando em factor variáveis desejadas
+         ano = ano |> as_factor(),
+         uf = uf |> as_factor() ) -> pop_pnadc
+
+#Join homicídios e população.  
+left_join(x = homic, y = pop_pnadc, by = join_by("ano","cod_uf_resd" == "cod_ibge","def_uf_resd" == "uf") ) |>
+  #O código da UF não é mais necessário
+  select(!c(cod_uf_resd) ) -> base
+rm(homic,pop_pnadc)
+
+#Acrescentando total Brasil e criando taxas
+base %>%
+  bind_rows(. |>
+              summarise(def_uf_resd="Brasil" |> as.factor(),
+                        pop = sum(pop),
+                        homicidio = sum(homicidio), .by=ano) ) |>
+  #Taxa de homicídio. Padrão Atlas. A taxa somente com uma casa decimal.
+  mutate(tx_homic = format(round((homicidio/pop)*100000,digits = 1) ) |> as.double() ) -> base
+
+#Tabela formato wide do número de homicídios de mulheres
+base |> select(ano,def_uf_resd,homicidio) |>
+  pivot_wider(names_from = ano, values_from = homicidio) %>%
+  #Variações
+  mutate(
+    
+    #Anual
+    "{names(.)[ncol(.)-1]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[ncol(.)-1]]) / .[[ncol(.)-1]] * 100, 1), decimal.mark = ","), 
+    
+    #Cinco anos
+    "{names(.)[7]} a {names(.)[ncol(.)]} " := 
+      format(round((.[[ncol(.)]] - .[[7]]) / .[[7]] * 100, 1), decimal.mark = ","),
+    
+    #Dez anos 
+    "{names(.)[2]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[2]]) / .[[2]] * 100, 1), decimal.mark = ",") )  |>
+  
+  
+  #Ordenando a linha da tabela seguindo o padrão Atlas.
+  slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
+                "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
+                "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
+                "Sergipe","Tocantins"),def_uf_resd) ) |>
+  # Converte as colunas numéricas para caracteres e substitui pontos por vírgulas.
+  #Assim fica mais fácil converter para numérico no excel.
+  mutate(across(where(is.numeric), ~ str_replace_all(as.character(.), "\\.", ","))) %>%
+  add_row(
+    def_uf_resd = "Fonte: MS/SVSA/CGIAE - Sistema de Informações sobre Mortalidade - SIM. Elaboração: Diest/Ipea e FBSP. Nota: O número de homicídios de mulheres na UF de residência foi obtido pela soma das seguintes CIDs 10: X85-Y09 e Y35 - Y36, ou seja, óbitos causados por agressão, intervenção legal e operações de guerra.") |>
+  #Título da Tabela
+  adorn_title(placement = "top", row_name = "",
+              col_name = glue::glue("Homicídios de mulheres, por UF {min(year)}–{max(year)}") ) |> 
+  #Exportando tabela.
+  rio::export(x= _ ,"base/n_homicidio_mulher_uf_br.xlsx")
+
+
+#Tabela formato wide da taxa de homicídios de mulheres.
+base |> select(ano, def_uf_resd, tx_homic) |>
+  pivot_wider(names_from = ano, values_from = tx_homic) %>%
+  #Variações
+  
+  mutate(
+    #Anual
+    "{names(.)[ncol(.)-1]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[ncol(.)-1]]) / .[[ncol(.)-1]] * 100, 1), decimal.mark = ","), 
+    
+    #Cinco anos
+    "{names(.)[7]} a {names(.)[ncol(.)]} " := 
+      format(round((.[[ncol(.)]] - .[[7]]) / .[[7]] * 100, 1), decimal.mark = ","),
+    
+    #Dez anos 
+    "{names(.)[2]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[2]]) / .[[2]] * 100, 1), decimal.mark = ",") )  |>
+  
+  #Ordenando a linha da tabela seguindo o padrão Atlas.
+  slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
+                "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
+                "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
+                "Sergipe","Tocantins"),def_uf_resd) ) |>
+  # Converte as colunas numéricas para caracteres e substitui pontos por vírgulas.
+  #Assim fica mais fácil converter para numérico no excel.
+  mutate(across(where(is.numeric), ~ str_replace_all(as.character(.), "\\.", ","))) %>%
+  #Nota de rodapé
+  add_row(
+    def_uf_resd = "Fonte: IBGE - Pesquisa Nacional por Amostra de Domicílios Contínua (PNADc) e MS/SVSA/CGIAE - Sistema de Informações sobre Mortalidade - SIM. Elaboração: Diest/Ipea e FBSP. Nota: O número de homicídios de mulheres na UF de residência foi obtido pela soma das seguintes CIDs 10: X85-Y09 e Y35 - Y36, ou seja, óbitos causados por agressão, intervenção legal e operações de guerra.") |>
+  #Título da Tabela
+  adorn_title(placement = "top", row_name = "",
+              col_name = glue::glue("Taxa de homicídios de mulheres, por UF {min(year)}–{max(year)}") )  |>
+  #Exportando tabela.
+  rio::export(x= _ ,"base/taxa_homicidio_mulher_uf_br.xlsx")
+
+
+
+# Gráfico com as as três UFs de maior taxa + taxa Brasil
+base |>
+  select(ano,def_uf_resd,tx_homic) |>
+  pivot_wider(names_from = ano, values_from = tx_homic, names_prefix = "ano_") |>
+  #Ordenando linhas para maiores taxas em 2024
+  arrange(desc(ano_2024)) |>
+  #Filtro das três UFs de maior taxa em 2023 + a taxa Brasil
+  filter(def_uf_resd %in% c(def_uf_resd[1:4]) | def_uf_resd == "Brasil") |>
+  #Exportando ranking das UFs mais violêntas, mulher
+  rio::export(x = _, "base/ranking_tx_homic_mulher.xlsx")
+
+rm(list = ls())
+
+# Homicídio Mulher residência\domicílio ---------------------------------------------
+library(tidyverse)
+library(janitor)
+#Pasta raiz
+here::i_am("Rotinas/Tabelas Padrão - Atlas 2026.R") 
+#Importação base de interesse
+load(paste0(dirname(getwd()),"/bases/sim/RData/sim_doext_14_24.Rdata"))
+year <- c(2014:2024)
+
+#Homicídio feminino, local do acidente = residencial. Aqui poderia entrar Habitação coletiva
+sim_doext |> 
+  
+  filter(ano %in% year) |>
+  
+  filter(intencao_homic == "Homicídio" & def_sexo == "Mulher")  |> droplevels() |>
+  tabyl(ano,local_incd) |>
+  #Homicídios fora da residência. Somatório de todos os locais do incidente, exceto Residencial. Entendo que Hab Coletiva é residencia.
+  mutate(homic_out = rowSums(across(!c(ano,Residencial)))) |> 
+  rename(homic_resd = Residencial) |> select(ano,homic_out,homic_resd) -> homic_fem
+
+
+##Importando população feminina
+#Caminho do excel com pnadc geral
+excel_pnadc <- paste0(dirname(getwd()),"/bases/populacao/Pop_Geral_UFs_PNADc.xlsx")
+
+#Importação e empilhando os últimos dez anos da PNADc
+pop_pnadc <- map_dfr(
+  #Tail informa que desejamos os últimos dez anos da pnadc
+  .x = tail(readxl::excel_sheets(excel_pnadc), 11),
+  
+  ~ readxl::read_excel(path = excel_pnadc, sheet = .x) ) |>
+  
+  #Selecionando população mulher
+  select(uf = UF,ano, pop = PoP.Mulher)
+rm(excel_pnadc)
+
+#Tratamento base com população PNADc
+pop_pnadc |> 
+  #Excluindo as regiões. Não utilizado
+  filter( !(uf %in% c("Norte","Centro Oeste","Nordeste","Sudeste","Sul") ) )  |>
+  
+  #Somatório população mulher. Pop Mulher Brasil
+  summarise(pop = sum(pop), .by = ano) |>
+  
+  mutate(ano = ano |> as_factor() ) -> pop_pnadc
+
+#Join população feminina e homicídio feminio residencial.
+left_join(pop_pnadc, homic_fem, by = join_by("ano") ) |>
+  mutate(tx_homic_resd = round((homic_resd/pop)*100000,2),
+         tx_homic_out = round((homic_out/pop)*100000,2)) |> 
+  select(ano,starts_with("tx") ) |> 
+  
+  pivot_longer(cols = starts_with("tx_homic"), 
+               names_to = "tipo_homicidio", 
+               values_to = "taxa") %>%
+  
+  pivot_wider(names_from = ano, values_from = taxa) |> 
+  #Exportando.
+  rio::export(x=_,"base/tx_homic_fem_resd_out.xlsx")
+
+rm(list = ls() )
+
+
+# Homicídios mulheres negras ----------------------------------------------
+library(tidyverse)
+library(janitor)
+#Pasta raiz
+here::i_am("Rotinas/Tabelas Padrão - Atlas 2026.R") 
+#Importação base de interesse
+load(paste0(dirname(getwd()),"/bases/sim/RData/sim_doext_14_24.Rdata"))
+year <- c(2014:2024)
+
+#Contagem de homicídios registrados, por ano e UF
+sim_doext |> 
+  #Filtro das intenções de interesse.
+  filter(intencao_homic  == "Homicídio" & def_sexo == "Mulher" & def_racacor %in% c("Parda","Preta") ) |>
+  #Poderia adcionar total brasil. Mas precisa adicionar brasil na pop. Vou acrescentar Brasil após juntas as bases.
+  count(ano,cod_uf_resd,def_uf_resd, name = "homicidio") |>
+  #Sim oriundo do duckdb
+  mutate(cod_uf_resd = cod_uf_resd |> as.integer() ) -> homic
+
+##Importando população.
+#Caminho do excel com pnadc geral
+excel_pnadc <- paste0(dirname(getwd()),"/bases/populacao/Pop_Geral_UFs_PNADc.xlsx")
+
+#Importação e empilhando os últimos dez anos da PNADc
+pop_pnadc <- map_dfr(
+  #Tail informa que desejamos os últimos dez anos da pnadc
+  .x = tail(readxl::excel_sheets(excel_pnadc), 11),
+  
+  ~ readxl::read_excel(path = excel_pnadc, sheet = .x) ) |>
+  
+  #Selecionando população mulher
+  select(uf = UF,ano, pop = M.Negro)
+rm(excel_pnadc)
+
+#Tratamento base com população PNADc
+pop_pnadc |> 
+  #Excluindo as regiões. Não utilizado
+  filter(!(uf %in% c("Norte","Centro Oeste","Nordeste","Sudeste","Sul"))) |>
+  #Incluindo código das UFs
+  mutate(cod_ibge = recode(uf, "Rondônia" = 11,"Acre" = 12, "Amazonas" = 13, "Roraima" = 14, "Pará" = 15, "Amapá" = 16,
+                           "Maranhão" = 21, "Piauí" = 22, "Ceará" = 23, "Rio Grande do Norte" = 24, "Paraíba" = 25, 
+                           "Pernambuco" = 26, "Alagoas" = 27, "Sergipe" = 28, "Bahia" = 29, "Minas Gerais" = 31,
+                           "Espírito Santo" = 32, "Rio de Janeiro" = 33, "São Paulo" = 35, "Paraná" = 41, "Santa Catarina" = 42,
+                           "Rio Grande do Sul" = 43, "Mato Grosso do Sul" = 50, "Mato Grosso" = 51, "Goiás" = 52,
+                           "Distrito Federal" = 53, "Tocantins" = 17), .before=uf,
+         #Transofrmando em factor variáveis desejadas
+         ano = ano |> as_factor(),
+         uf = uf |> as_factor() ) -> pop_pnadc
+
+#Join homicídios e população.  
+left_join(x = homic, y = pop_pnadc, by = join_by("ano","cod_uf_resd" == "cod_ibge","def_uf_resd" == "uf") ) |>
+  #O código da UF não é mais necessário
+  select(!c(cod_uf_resd) ) -> base
+rm(homic,pop_pnadc)
+
+#Acrescentando total Brasil e criando taxas
+base %>%
+  bind_rows(. |>
+              summarise(def_uf_resd="Brasil" |> as.factor(),
+                        pop = sum(pop),
+                        homicidio = sum(homicidio), .by=ano) ) |>
+  #Taxa de homicídio. Padrão Atlas. A taxa somente com uma casa decimal.
+  mutate(tx_homic = format(round((homicidio/pop)*100000,digits = 1) ) |> as.double() ) -> base
+
+#Tabela formato wide do número de homicídios de mulheres
+base |> select(ano,def_uf_resd,homicidio) |>
+  pivot_wider(names_from = ano, values_from = homicidio) %>%
+  #Variações
+  mutate(
+  #Anual
+  "{names(.)[ncol(.)-1]} a {names(.)[ncol(.)]}" := 
+  format(round((.[[ncol(.)]] - .[[ncol(.)-1]]) / .[[ncol(.)-1]] * 100, 1), decimal.mark = ","), 
+
+  #Cinco anos
+  "{names(.)[7]} a {names(.)[ncol(.)]} " := 
+  format(round((.[[ncol(.)]] - .[[7]]) / .[[7]] * 100, 1), decimal.mark = ","),
+
+  #Dez anos 
+  "{names(.)[2]} a {names(.)[ncol(.)]}" := 
+  format(round((.[[ncol(.)]] - .[[2]]) / .[[2]] * 100, 1), decimal.mark = ",") )  |>
+                                         
+  #Ordenando a linha da tabela seguindo o padrão Atlas.
+  slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
+                "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
+                "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
+                "Sergipe","Tocantins"),def_uf_resd) ) |>
+                                         
+  # Converte as colunas numéricas para caracteres e substitui pontos por vírgulas.
+  #Assim fica mais fácil converter para numérico no excel.
+  mutate(across(where(is.numeric), ~ str_replace_all(as.character(.), "\\.", ","))) %>%
+  #Nota de rodapé
+  add_row(
+  def_uf_resd = "Fonte: MS/SVSA/CGIAE - Sistema de Informações sobre Mortalidade - SIM. Elaboração: Diest/Ipea e FBSP. Nota: O número de homicídios de mulheres na UF de residência foi obtido pela soma das seguintes CIDs 10: X85-Y09 e Y35 - Y36, ou seja, óbitos causados por agressão, intervenção legal e operações de guerra. O número de negras é a soma de pretas e pardas.") |>
+  #Título da Tabela
+  adorn_title(placement = "top", row_name = "",
+  col_name = glue::glue("Homicídios de mulheres negras, por UF {min(year)}–{max(year)}") ) |>                               
+  #Exportando tabela.
+  rio::export(x = _ ,"base/n_homicidio_mulher_negra_uf_br.xlsx")
+
+   ### Taxa de homicídios de mulheres negras ###
+
+                                    
+#Tabela formato wide da taxa de homicídios de mulheres.
+base |> select(ano, def_uf_resd, tx_homic) |>
+  pivot_wider(names_from = ano, values_from = tx_homic) %>%
+  #Variações
+  mutate(
+    #Anual
+    "{names(.)[ncol(.)-1]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[ncol(.)-1]]) / .[[ncol(.)-1]] * 100, 1), decimal.mark = ","), 
+    
+    #Cinco anos
+    "{names(.)[7]} a {names(.)[ncol(.)]} " := 
+      format(round((.[[ncol(.)]] - .[[7]]) / .[[7]] * 100, 1), decimal.mark = ","),
+    
+    #Dez anos 
+    "{names(.)[2]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[2]]) / .[[2]] * 100, 1), decimal.mark = ",") )  |>
+  
+  #Ordenando a linha da tabela seguindo o padrão Atlas.
+  slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
+                "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
+                "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
+                "Sergipe","Tocantins"),def_uf_resd) ) |>
+  
+  # Converte as colunas numéricas para caracteres e substitui pontos por vírgulas.
+  #Assim fica mais fácil converter para numérico no excel.
+  mutate(across(where(is.numeric), ~ str_replace_all(as.character(.), "\\.", ","))) %>%
+  #Nota de rodapé
+  add_row(
+  def_uf_resd = "Fonte: IBGE - Pesquisa Nacional por Amostra de Domicílios Contínua (PNADc) e MS/SVSA/CGIAE - Sistema de Informações sobre Mortalidade - SIM. Elaboração: Diest/Ipea e FBSP. Nota: O número de homicídios de mulheres na UF de residência foi obtido pela soma das seguintes CIDs 10: X85-Y09 e Y35 - Y36, ou seja, óbitos causados por agressão, intervenção legal e operações de guerra. O número de negras é a soma de pretas e pardas.") |>
+  #Título da Tabela
+  adorn_title(placement = "top", row_name = "",
+              col_name = glue::glue("Taxa de homicídios de mulheres negras, por UF {min(year)}–{max(year)}") ) |> 
+   #Exportando tabela.
+  rio::export(x= _ ,"base/taxa_homicidio_mulher_negra_uf_br.xlsx")
+
+
+
+rm(list = ls() )
+
+
+
+# Homicídio Mulheres Não Negras -------------------------------------------
+library(tidyverse)
+library(janitor)
+#Pasta raiz
+here::i_am("Rotinas/Tabelas Padrão - Atlas 2026.R") 
+#Importação base de interesse
+load(paste0(dirname(getwd()),"/bases/sim/RData/sim_doext_14_24.Rdata"))
+year <- c(2014:2024)
+
+#Contagem de homicídios registrados, por ano e UF
+sim_doext |> 
+  
+  #Filtro das intenções de interesse.
+  filter(intencao_homic == "Homicídio" & def_sexo == "Mulher" & def_racacor %in% c("Amarela","Branca","Indigena") ) |>
+  #Poderia adcionar total brasil. Mas precisa adicionar brasil na pop. Vou acrescentar Brasil após juntas as bases.
+  count(ano, cod_uf_resd, def_uf_resd, name = "homicidio") |>
+  #base sim extraida do duckdb
+  mutate(cod_uf_resd = cod_uf_resd |> as.integer() ) -> homic
+
+##Importando população de mulher não negra.
+excel_pnadc <- paste0(dirname(getwd()),"/bases/populacao/Pop_Geral_UFs_PNADc.xlsx")
+
+#Importação e empilhando os últimos dez anos da PNADc
+pop_pnadc <- map_dfr(
+  #Tail informa que desejamos os últimos dez anos da pnadc
+  .x = tail(readxl::excel_sheets(excel_pnadc), 11),
+  
+  ~ readxl::read_excel(path = excel_pnadc, sheet = .x) ) |>
+  
+  #Selecionando população mulher
+  select(uf = UF,ano, pop = M.Não_Negra)
+rm(excel_pnadc)
+
+#Tratamento base com população PNADc
+pop_pnadc |> 
+  #Excluindo as regiões. Não utilizado
+  filter(!(uf %in% c("Norte","Centro Oeste","Nordeste","Sudeste","Sul"))) |>
+  #Incluindo código das UFs
+  mutate(cod_ibge = recode(uf, "Rondônia" = 11,"Acre" = 12, "Amazonas" = 13, "Roraima" = 14, "Pará" = 15, "Amapá" = 16,
+                           "Maranhão" = 21, "Piauí" = 22, "Ceará" = 23, "Rio Grande do Norte" = 24, "Paraíba" = 25, 
+                           "Pernambuco" = 26, "Alagoas" = 27, "Sergipe" = 28, "Bahia" = 29, "Minas Gerais" = 31,
+                           "Espírito Santo" = 32, "Rio de Janeiro" = 33, "São Paulo" = 35, "Paraná" = 41, "Santa Catarina" = 42,
+                           "Rio Grande do Sul" = 43, "Mato Grosso do Sul" = 50, "Mato Grosso" = 51, "Goiás" = 52,
+                           "Distrito Federal" = 53, "Tocantins" = 17), .before=uf,
+         #Transofrmando em factor variáveis desejadas
+         ano = ano |> as_factor(),
+         uf = uf |> as_factor() ) -> pop_pnadc
+
+#Join homicídios e população.  
+left_join(x = homic, y = pop_pnadc, by = join_by("ano","cod_uf_resd" == "cod_ibge","def_uf_resd" == "uf") ) |>
+  #O código da UF não é mais necessário
+  select(!c(cod_uf_resd) ) -> base
+rm(homic,pop_pnadc)
+
+#Acrescentando total Brasil e criando taxas
+base %>%
+  bind_rows(. |>
+              summarise(def_uf_resd="Brasil" |> as.factor(),
+                        pop = sum(pop),
+                        homicidio = sum(homicidio), .by=ano) ) |>
+  #Taxa de homicídio. Padrão Atlas. A taxa somente com uma casa decimal.
+  mutate(tx_homic = format(round((homicidio/pop)*100000,digits = 1) ) |> as.double() ) -> base
+
+#Tabela formato wide do número de homicídios de mulheres não negras
+base |> select(ano,def_uf_resd,homicidio) |>
+  pivot_wider(names_from = ano, values_from = homicidio, values_fill = 0) %>%
+  #Variações
+  mutate(
+    #Anual
+    "{names(.)[ncol(.)-1]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[ncol(.)-1]]) / .[[ncol(.)-1]] * 100, 1), decimal.mark = ","), 
+    
+    #Cinco anos
+    "{names(.)[7]} a {names(.)[ncol(.)]} " := 
+      format(round((.[[ncol(.)]] - .[[7]]) / .[[7]] * 100, 1), decimal.mark = ","),
+    
+    #Dez anos 
+    "{names(.)[2]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[2]]) / .[[2]] * 100, 1), decimal.mark = ",") )  |>
+  
+  #Ordenando a linha da tabela seguindo o padrão Atlas.
+  slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
+                "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
+                "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
+                "Sergipe","Tocantins"),def_uf_resd) ) |>
+  # Converte as colunas numéricas para caracteres e substitui pontos por vírgulas.
+  #Assim fica mais fácil converter para numérico no excel.
+  mutate(across(where(is.numeric), ~ str_replace_all(as.character(.), "\\.", ","))) %>%
+  #Nota de rodapé
+  add_row(
+    def_uf_resd = "Fonte: MS/SVSA/CGIAE - Sistema de Informações sobre Mortalidade - SIM. Elaboração: Diest/Ipea e FBSP. Nota: O número de homicídios de mulheres na UF de residência foi obtido pela soma das seguintes CIDs 10: X85-Y09 e Y35 - Y36, ou seja, óbitos causados por agressão, intervenção legal e operações de guerra. O número de não negras foi obtido pela soma de brancas, amarelas e indígenas.") |>
+  #Título da Tabela
+  adorn_title(placement = "top", row_name = "",
+              col_name = glue::glue("Homicídios de mulheres não negras, por UF {min(year)}–{max(year)}") ) |>
+  #Exportando tabela.
+  rio::export(x = _ ,"base/n_homicidio_mulher_nao_negra_uf_br.xlsx")
+
+
+#Tabela formato wide da taxa de homicídios de mulheres não negra.
+base |> select(ano, def_uf_resd, tx_homic) |>
+  pivot_wider(names_from = ano, values_from = tx_homic, values_fill = 0) %>%
+  
+  #Variações
+  mutate(
+  #Anual
+  "{names(.)[ncol(.)-1]} a {names(.)[ncol(.)]}" := 
+  format(round((.[[ncol(.)]] - .[[ncol(.)-1]]) / .[[ncol(.)-1]] * 100, 1), decimal.mark = ","), 
+
+  #Cinco anos
+  "{names(.)[7]} a {names(.)[ncol(.)]} " := 
+  format(round((.[[ncol(.)]] - .[[7]]) / .[[7]] * 100, 1), decimal.mark = ","),
+
+  #Dez anos 
+  "{names(.)[2]} a {names(.)[ncol(.)]}" := 
+  format(round((.[[ncol(.)]] - .[[2]]) / .[[2]] * 100, 1), decimal.mark = ",") )  |>
+                                         
+  #Ordenando a linha da tabela seguindo o padrão Atlas.
+  slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
+                "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
+                "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
+                "Sergipe","Tocantins"),def_uf_resd) ) |>
+  
+  # Converte as colunas numéricas para caracteres e substitui pontos por vírgulas.
+  #Assim fica mais fácil converter para numérico no excel.
+  mutate(across(where(is.numeric), ~ str_replace_all(as.character(.), "\\.", ","))) %>%
+  #Nota de rodapé
+  add_row(
+    def_uf_resd = "Fonte: IBGE - Pesquisa Nacional por Amostra de Domicílios Contínua (PNADc) e MS/SVS/CGIAE - Sistema de Informações sobre Mortalidade - SIM. Elaboração: Diest/Ipea e FBSP. Nota: O número de homicídios de mulheres na UF de residência foi obtido pela soma das seguintes CIDs 10: X85-Y09 e Y35 - Y36, ou seja, óbitos causados por agressão, intervenção legal e operações de guerra. O número de não negras foi obtido pela soma de brancas, amarelas e indígenas.") |>
+  #Título da Tabela
+  adorn_title(placement = "top", row_name = "",
+              col_name = glue::glue("Taxa de homicídios de mulheres negras, por UF {min(year)}–{max(year)}") ) |>
+  #Exportando tabela.
+  rio::export(x= _ ,"base/taxa_homicidio_mulher_nao_negra_uf_br.xlsx")
+
+rm(list = ls() )
+
+
+
+# Homicídio de negros -----------------------------------------------------
+library(tidyverse)
+library(janitor)
+
+#Importando base de homicídios
+load("C:/Users/gabli/Desktop/r/SIM/Atlas 2025/sim_doext_13_23.RData")
+
+#Contagem de homicídios registrados, por ano e UF
+sim_doext |> 
+  
+  #Filtro das intenções de interesse.
+  filter(intencao_homic == "Homicídio" & racacor %in% c("Parda","Preta") ) |>
+  
+  #Poderia adcionar total brasil. Mas precisa adicionar brasil na pop. Vou acrescentar Brasil após juntas as bases.
+  count(ano, cod_uf_resd, uf_resd, name = "homicidio") -> homic
+
+
+##Importando população de negros.
+#Caminho do excel com pnadc
+excel_pnadc <- "C:/Users/gabli/Dropbox/Ipea/Atlas/Pop_Geral_UFs_PNADc.xlsx"
+
+#Importação e empilhando os últimos dez anos da PNADc
+pop_pnadc <- map_dfr(
+  #Tail informa que desejamos os últimos dez anos da pnadc
+  .x = tail(readxl::excel_sheets(excel_pnadc), 11),
+  
+  ~ readxl::read_excel(path = excel_pnadc, sheet = .x) ) |>
+  
+  #Selecionando população negra
+  select(uf = UF,ano, pop = Pop.Negro)
+rm(excel_pnadc)
+
+#Tratamento base com população PNADc
+pop_pnadc |> 
+  #Excluindo as regiões. Não utilizado
+  filter(!(uf %in% c("Norte","Centro Oeste","Nordeste","Sudeste","Sul"))) |>
+  #Incluindo código das UFs
+  mutate(cod_ibge = recode(uf, "Rondônia" = 11,"Acre" = 12, "Amazonas" = 13, "Roraima" = 14, "Pará" = 15, "Amapá" = 16,
+                           "Maranhão" = 21, "Piauí" = 22, "Ceará" = 23, "Rio Grande do Norte" = 24, "Paraíba" = 25, 
+                           "Pernambuco" = 26, "Alagoas" = 27, "Sergipe" = 28, "Bahia" = 29, "Minas Gerais" = 31,
+                           "Espírito Santo" = 32, "Rio de Janeiro" = 33, "São Paulo" = 35, "Paraná" = 41, "Santa Catarina" = 42,
+                           "Rio Grande do Sul" = 43, "Mato Grosso do Sul" = 50, "Mato Grosso" = 51, "Goiás" = 52,
+                           "Distrito Federal" = 53, "Tocantins" = 17), .before=uf,
+         #Transofrmando em factor variáveis desejadas
+         ano = ano |> as_factor(),
+         uf = uf |> as_factor() ) -> pop_pnadc
+
+#Join homicídios e população.  
+left_join(x = homic, y = pop_pnadc, by = join_by("ano","cod_uf_resd" == "cod_ibge","uf_resd" == "uf") ) |>
+  #O código da UF não é mais necessário
+  select(!c(cod_uf_resd) ) -> base
+rm(homic,pop_pnadc)
+
+#Acrescentando total Brasil e criando taxas
+base %>%
+  bind_rows(. |>
+              summarise(uf_resd="Brasil" |> as.factor(),
+                        pop = sum(pop),
+                        homicidio = sum(homicidio), .by=ano) ) |>
+  #Taxa de homicídio. Padrão Atlas. A taxa somente com uma casa decimal.
+  mutate(tx_homic = format(round((homicidio/pop)*100000,digits = 1) ) |> as.double() ) -> base
+
+#Tabela formato wide do número de homicídios de mulheres não negras
+base |> select(ano,uf_resd,homicidio) |>
+  pivot_wider(names_from = ano, values_from = homicidio, values_fill = 0) %>%
+  #Variações
+  mutate(
+    #Dez anos
+    "{names(.)[2]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[2]]) / .[[2]] * 100, 1), decimal.mark = ","),
+    #Anual
+    "{names(.)[ncol(.)-1]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[ncol(.)-1]]) / .[[ncol(.)-1]] * 100, 1), decimal.mark = ","),
+    #Cinco anos
+    "{names(.)[7]} a {names(.)[ncol(.)]} " := 
+      format(round((.[[ncol(.)]] - .[[7]]) / .[[7]] * 100, 1), decimal.mark = ",") ) |>
+  #Ordenando a linha da tabela seguindo o padrão Atlas.
+  slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
+                "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
+                "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
+                "Sergipe","Tocantins"),uf_resd) ) |>
+  # Converte as colunas numéricas para caracteres e substitui pontos por vírgulas.
+  #Assim fica mais fácil converter para numérico no excel.
+  mutate(across(where(is.numeric), ~ str_replace_all(as.character(.), "\\.", ","))) %>%
+  #Necessário para colocar o título
+  as_tibble() |>
+  adorn_title(placement = "top",col_name = "Homicídios de negros, por UF – Brasil (2013-2023)") |>
+  #Exportando tabela.
+  rio::export(x = _ ,"n_homicidio_negro_uf_br.xlsx")
+
+
+#Tabela formato wide da taxa de homicídios de negros.
+base |> select(ano, uf_resd, tx_homic) |>
+  pivot_wider(names_from = ano, values_from = tx_homic, values_fill = 0) %>%
+  #Variações
+  mutate(
+    #Dez anos
+    "{names(.)[2]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[2]]) / .[[2]] * 100, 1), decimal.mark = ","),
+    #Anual
+    "{names(.)[ncol(.)-1]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[ncol(.)-1]]) / .[[ncol(.)-1]] * 100, 1), decimal.mark = ","),
+    #Cinco anos
+    "{names(.)[7]} a {names(.)[ncol(.)]} " := 
+      format(round((.[[ncol(.)]] - .[[7]]) / .[[7]] * 100, 1), decimal.mark = ",") ) |>
+  #Ordenando a linha da tabela seguindo o padrão Atlas.
+  slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
+                "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
+                "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
+                "Sergipe","Tocantins"),uf_resd) ) |>
+  # Converte as colunas numéricas para caracteres e substitui pontos por vírgulas.
+  #Assim fica mais fácil converter para numérico no excel.
+  mutate(across(where(is.numeric), ~ str_replace_all(as.character(.), "\\.", ","))) %>%
+  #Necessário para colocar o título
+  as_tibble() |>
+  adorn_title(placement = "top", col_name = "Taxa de homicídios negros, por UF – Brasil (2013-2023)") |>
+  #Exportando tabela.
+  rio::export(x= _ ,"taxa_homicidio_negro_uf_br.xlsx")
+rm(base, sim_doext)
+
+
+
