@@ -1420,23 +1420,26 @@ rm(list = ls() )
 # Homicídio de negros -----------------------------------------------------
 library(tidyverse)
 library(janitor)
-
-#Importando base de homicídios
-load("C:/Users/gabli/Desktop/r/SIM/Atlas 2025/sim_doext_13_23.RData")
+#Pasta raiz
+here::i_am("Rotinas/Tabelas Padrão - Atlas 2026.R") 
+#Importação base de interesse
+load(paste0(dirname(getwd()),"/bases/sim/RData/sim_doext_14_24.Rdata"))
+year <- c(2014:2024)
 
 #Contagem de homicídios registrados, por ano e UF
 sim_doext |> 
   
   #Filtro das intenções de interesse.
-  filter(intencao_homic == "Homicídio" & racacor %in% c("Parda","Preta") ) |>
+  filter(intencao_homic == "Homicídio" & def_racacor %in% c("Parda","Preta") ) |>
   
   #Poderia adcionar total brasil. Mas precisa adicionar brasil na pop. Vou acrescentar Brasil após juntas as bases.
-  count(ano, cod_uf_resd, uf_resd, name = "homicidio") -> homic
+  count(ano, cod_uf_resd, def_uf_resd, name = "homicidio") |>
+  #Sim extraido do duckdb.
+  mutate(cod_uf_resd = cod_uf_resd |> as.integer() ) -> homic
 
 
 ##Importando população de negros.
-#Caminho do excel com pnadc
-excel_pnadc <- "C:/Users/gabli/Dropbox/Ipea/Atlas/Pop_Geral_UFs_PNADc.xlsx"
+excel_pnadc <- paste0(dirname(getwd()),"/bases/populacao/Pop_Geral_UFs_PNADc.xlsx")
 
 #Importação e empilhando os últimos dez anos da PNADc
 pop_pnadc <- map_dfr(
@@ -1465,7 +1468,7 @@ pop_pnadc |>
          uf = uf |> as_factor() ) -> pop_pnadc
 
 #Join homicídios e população.  
-left_join(x = homic, y = pop_pnadc, by = join_by("ano","cod_uf_resd" == "cod_ibge","uf_resd" == "uf") ) |>
+left_join(x = homic, y = pop_pnadc, by = join_by("ano","cod_uf_resd" == "cod_ibge","def_uf_resd" == "uf") ) |>
   #O código da UF não é mais necessário
   select(!c(cod_uf_resd) ) -> base
 rm(homic,pop_pnadc)
@@ -1473,69 +1476,86 @@ rm(homic,pop_pnadc)
 #Acrescentando total Brasil e criando taxas
 base %>%
   bind_rows(. |>
-              summarise(uf_resd="Brasil" |> as.factor(),
+              summarise(def_uf_resd="Brasil" |> as.factor(),
                         pop = sum(pop),
                         homicidio = sum(homicidio), .by=ano) ) |>
   #Taxa de homicídio. Padrão Atlas. A taxa somente com uma casa decimal.
   mutate(tx_homic = format(round((homicidio/pop)*100000,digits = 1) ) |> as.double() ) -> base
 
 #Tabela formato wide do número de homicídios de mulheres não negras
-base |> select(ano,uf_resd,homicidio) |>
+base |> select(ano,def_uf_resd,homicidio) |>
   pivot_wider(names_from = ano, values_from = homicidio, values_fill = 0) %>%
+  
   #Variações
   mutate(
-    #Dez anos
-    "{names(.)[2]} a {names(.)[ncol(.)]}" := 
-      format(round((.[[ncol(.)]] - .[[2]]) / .[[2]] * 100, 1), decimal.mark = ","),
     #Anual
     "{names(.)[ncol(.)-1]} a {names(.)[ncol(.)]}" := 
-      format(round((.[[ncol(.)]] - .[[ncol(.)-1]]) / .[[ncol(.)-1]] * 100, 1), decimal.mark = ","),
+      format(round((.[[ncol(.)]] - .[[ncol(.)-1]]) / .[[ncol(.)-1]] * 100, 1), decimal.mark = ","), 
+    
     #Cinco anos
     "{names(.)[7]} a {names(.)[ncol(.)]} " := 
-      format(round((.[[ncol(.)]] - .[[7]]) / .[[7]] * 100, 1), decimal.mark = ",") ) |>
+      format(round((.[[ncol(.)]] - .[[7]]) / .[[7]] * 100, 1), decimal.mark = ","),
+    
+    #Dez anos 
+    "{names(.)[2]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[2]]) / .[[2]] * 100, 1), decimal.mark = ",") )  |>
+  
   #Ordenando a linha da tabela seguindo o padrão Atlas.
   slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
                 "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
                 "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
-                "Sergipe","Tocantins"),uf_resd) ) |>
+                "Sergipe","Tocantins"),def_uf_resd) ) |>
   # Converte as colunas numéricas para caracteres e substitui pontos por vírgulas.
   #Assim fica mais fácil converter para numérico no excel.
   mutate(across(where(is.numeric), ~ str_replace_all(as.character(.), "\\.", ","))) %>%
-  #Necessário para colocar o título
-  as_tibble() |>
-  adorn_title(placement = "top",col_name = "Homicídios de negros, por UF – Brasil (2013-2023)") |>
-  #Exportando tabela.
-  rio::export(x = _ ,"n_homicidio_negro_uf_br.xlsx")
+  
+  #Nota de rodapé
+  add_row(
+    def_uf_resd = "Fonte: MS/SVSA/CGIAE - Sistema de Informações sobre Mortalidade - SIM. Elaboração: Diest/Ipea e FBSP. Nota: O número de homicídios na UF de residência foi obtido pela soma das seguintes CIDs 10: X85-Y09 e Y35 - Y36, ou seja, óbitos causados por agressão, intervenção legal e operações de guerra. O número de negros foi obtido pela soma de pardos e pretos.") |>
+  #Título da Tabela
+  adorn_title(placement = "top", row_name = "",
+              col_name = glue::glue("Homicídios de negros, por UF {min(year)}–{max(year)}") ) |> 
+   #Exportando tabela.
+  rio::export(x = _ ,"base/n_homicidio_negro_uf_br.xlsx")
 
 
 #Tabela formato wide da taxa de homicídios de negros.
-base |> select(ano, uf_resd, tx_homic) |>
+base |> select(ano, def_uf_resd, tx_homic) |>
   pivot_wider(names_from = ano, values_from = tx_homic, values_fill = 0) %>%
   #Variações
   mutate(
-    #Dez anos
-    "{names(.)[2]} a {names(.)[ncol(.)]}" := 
-      format(round((.[[ncol(.)]] - .[[2]]) / .[[2]] * 100, 1), decimal.mark = ","),
     #Anual
     "{names(.)[ncol(.)-1]} a {names(.)[ncol(.)]}" := 
-      format(round((.[[ncol(.)]] - .[[ncol(.)-1]]) / .[[ncol(.)-1]] * 100, 1), decimal.mark = ","),
+      format(round((.[[ncol(.)]] - .[[ncol(.)-1]]) / .[[ncol(.)-1]] * 100, 1), decimal.mark = ","), 
+    
     #Cinco anos
     "{names(.)[7]} a {names(.)[ncol(.)]} " := 
-      format(round((.[[ncol(.)]] - .[[7]]) / .[[7]] * 100, 1), decimal.mark = ",") ) |>
+      format(round((.[[ncol(.)]] - .[[7]]) / .[[7]] * 100, 1), decimal.mark = ","),
+    
+    #Dez anos 
+    "{names(.)[2]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[2]]) / .[[2]] * 100, 1), decimal.mark = ",") )  |>
+  
   #Ordenando a linha da tabela seguindo o padrão Atlas.
   slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
                 "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
                 "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
-                "Sergipe","Tocantins"),uf_resd) ) |>
+                "Sergipe","Tocantins"),def_uf_resd) ) |>
+  
   # Converte as colunas numéricas para caracteres e substitui pontos por vírgulas.
   #Assim fica mais fácil converter para numérico no excel.
   mutate(across(where(is.numeric), ~ str_replace_all(as.character(.), "\\.", ","))) %>%
-  #Necessário para colocar o título
-  as_tibble() |>
-  adorn_title(placement = "top", col_name = "Taxa de homicídios negros, por UF – Brasil (2013-2023)") |>
+  #Nota de rodapé
+  add_row(
+    def_uf_resd = "Fonte: IBGE - Pesquisa Nacional por Amostra de Domicílios Contínua (PNADc) e MS/SVSA/CGIAE - Sistema de Informações sobre Mortalidade - SIM. Elaboração: Diest/Ipea e FBSP. Nota: O número de homicídios na UF de residência foi obtido pela soma das seguintes CIDs 10: X85-Y09 e Y35 - Y36, ou seja, óbitos causados por agressão, intervenção legal e operações de guerra. O número de negros foi obtido pela soma de pardos e pretos.") |>
+  #Título da Tabela
+  adorn_title(placement = "top", row_name = "",
+              col_name = glue::glue("Taxa de homicídios negros, por UF {min(year)}–{max(year)}") ) |> 
   #Exportando tabela.
-  rio::export(x= _ ,"taxa_homicidio_negro_uf_br.xlsx")
-rm(base, sim_doext)
+  rio::export(x= _ ,"base/taxa_homicidio_negro_uf_br.xlsx")
+
+
+rm(list = ls() )
 
 
 
