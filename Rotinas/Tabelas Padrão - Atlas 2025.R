@@ -111,7 +111,7 @@ base |> select(ano,uf_resd,tx_homic) |>
   #Ordenando a linha da tabela seguindo o padrão Atlas.
   slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
                 "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
-                "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
+                "Rio De Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
                "Sergipe","Tocantins"),uf_resd) ) |>
   # Converte as colunas numéricas para caracteres e substitui pontos por vírgulas.
   #Assim fica mais fácil converter para numérico no excel.
