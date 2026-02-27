@@ -2259,7 +2259,82 @@ base |> select(ano, def_uf_resd, tx_suic) |>
               col_name = glue::glue("Taxa de suicídio de indígenas, por UF {min(year)}–{max(year)}") ) |> 
   #Exportando tabela.
   rio::export(x= _ ,"base/tx_ind_suic_uf_br.xlsx")
-rm(base, sim_doext)
+
+
+rm(list = ls())
+
+
+
+
+
+# Suicídio indígena e Geral -----------------------------------------------
+library(tidyverse)
+library(janitor)
+#Pasta raiz
+here::i_am("Rotinas/Tabelas Padrão - Atlas 2026.R") 
+#Importação base de interesse
+load(paste0(dirname(getwd()),"/bases/sim/RData/sim_doext_14_24.Rdata"))
+year <- c(2014:2024)
+
+
+#Contagem de suicídios registrados indígenas, por ano
+sim_doext |> 
+  #Filtro das intenções de interesse.
+  filter(intencao_homic == "Suicídio" & def_racacor == "Indigena") |>
+  #Contagem de suicídio de indígena
+  count(ano, name = "ind_suic") -> suic_ind
+
+#Contagem de suicídios de Brancos, Pardos, Pretos e Amarelos, por ano
+sim_doext |> 
+  #Filtro das intenções de interesse.
+  filter(intencao_homic == "Suicídio" & def_racacor %in% c("Parda","Branca","Preta","Amarela") ) |>
+  #Contagem de suicídio de indígena
+  count(ano, name = "br_suic") -> suic_br
+
+#Join suicídio Brasil e Suicídio Indígena
+left_join(x = suic_ind, y = suic_br, by = join_by("ano") ) -> suic
+rm(suic_br,suic_ind)
+
+
+##Importando população de indígenas e geral
+#Caminho do excel com pnadc
+excel_pnadc <- paste0(dirname(getwd()),"/bases/populacao/Pop_Geral_UFs_PNADc.xlsx")
+
+#Importação e empilhando os últimos dez anos da PNADc
+pop_pnadc <- map_dfr(
+  #Tail informa que desejamos os últimos dez anos da pnadc
+  .x = tail(readxl::excel_sheets(excel_pnadc), 11),
+  
+  ~ readxl::read_excel(path = excel_pnadc, sheet = .x) ) |>
+  
+  #Criando população de interesse
+  mutate(pop_geral = Pop.Branca + Pop.Preta + Pop.Amarela + Pop.Parda) |>
+  
+  #Selecionando população indígena
+  select(uf = UF, ano,
+         pop_ind = Pop.Indígena,
+         pop_geral) |>
+  
+  #Excluindo as regiões. Não utilizado
+  filter(!(uf %in% c("Norte","Centro Oeste","Nordeste","Sudeste","Sul") ) ) |>
+  #Total Brasil da pop geral e pop indígena 
+  summarise(pop_geral = sum(pop_geral),
+            pop_ind = sum(pop_ind), .by = ano) |>
+  mutate(ano = ano |> as_factor() )
+rm(excel_pnadc)
+
+
+#Join de suicídio e população
+left_join(x = pop_pnadc, y = suic, by = join_by("ano") ) |>
+  #Taxa de suicídio de indígenas Padrão Atlas. A taxa somente com uma casa decimal.
+  mutate(tx_suic_br = format(round((br_suic/pop_geral)*100000,digits = 1) ) |> as.double(),
+         
+         tx_suic_ind = format(round((ind_suic/pop_ind)*100000,digits = 1) ) |> as.double() ) |>
+  #Mantém séries de intersse
+  select(ano, br_suic, ind_suic, tx_suic_br, tx_suic_ind) |>
+  rio::export(x = _, "base/suicído_geral e indígena.xlsx")
+
+rm(list = ls())
 
 
 
