@@ -1558,4 +1558,164 @@ base |> select(ano, def_uf_resd, tx_homic) |>
 rm(list = ls() )
 
 
+# Homicídio de Negros - Capitais ----------------------------------------
+library(tidyverse)
+library(janitor)
+#Pasta raiz
+here::i_am("Rotinas/Tabelas Padrão - Atlas 2026.R") 
+#Importação base de interesse
+load(paste0(dirname(getwd()),"/bases/sim/RData/sim_doext_14_24.Rdata"))
+year <- c(2014:2024)
+
+
+#Paniel das capitais
+base_munic <- 
+  geobr::read_capitals() |> sf::st_drop_geometry() |> 
+  #No microdado do SIM. A partir de 2006 o código do município aparece com 6 dígitos. 
+  mutate(code_muni = code_muni |> str_sub(start = 1, end = 6), 
+         across( c(code_muni), ~ as_factor(.x) ),
+         name_muni = replace_values(x = name_muni,
+                        "Brasília" ~ "Distrito Federal") ) |> 
+  #Exclusão de variáveis não utilizadas  
+  select(!c(code_state,code_region,name_region,year)) |> 
+  #Painel de municípios
+  crossing(ano = year)  
+
+
+#Contagem de homicídios registrados, por ano nas capitais.
+sim_doext |> 
+  
+  #Base sim extraída do duckdb
+  mutate(ano = ano |> as.integer() ) |>
+  
+  
+  #Filtro das intenções de interesse.
+  filter(intencao_homic == "Homicídio" & def_racacor %in% c("Parda","Preta") & 
+           #Mantém somente capitias   
+           codmunresd %in% c( "120040", "270430", "160030", "130260", "292740", "230440", "530010", "320530", "520870", "211130",
+                              "510340", "500270", "310620", "150140", "250750", "410690", "261160", "221100", "330455", "240810",
+                              "431490", "110020", "140010", "420540", "355030", "280030", "172100") ) |>
+  
+  #Poderia adcionar total brasil. Mas precisa adicionar brasil na pop. Vou acrescentar Brasil após juntas as bases.
+  count(ano, codmunresd, name = "homicidio") -> homic
+
+#Join das capitais com homicídios nas capitais
+homic <- base_munic |> 
+  left_join(x = _, y = homic, 
+            join_by("ano","code_muni"== "codmunresd") ) 
+rm(base_munic)
+
+#Importando população de capitais Negros
+#Caminho do excel com pnadc
+excel_pnadc <- paste0(dirname(getwd()),"/bases/populacao/Pop_Geral_Cidades_PNADc.xlsx")
+
+#Importação e empilhando os últimos dez anos da PNADc
+pop_pnadc <- map_dfr(
+  #Tail informa que desejamos os últimos dez anos da pnadc
+  .x = tail(readxl::excel_sheets(excel_pnadc), 11),
+  
+  ~ readxl::read_excel(path = excel_pnadc, sheet = .x) ) |>
+  
+  #Selecionando população negros
+  select(code_muni, ano, pop = Pop.Negro)
+rm(excel_pnadc)
+
+#Join de painel capitais com homicídios e pnadc capitais
+homic |>
+  left_join(x = _, y = pop_pnadc, 
+            by = join_by("ano","code_muni" == "code_muni")) %>%
+  #Adiciona somatório de todas as capitais do Brasil
+  bind_rows(. |>
+              summarise(name_muni = "Capitais" |> as.factor(),
+                        pop = sum(pop),
+                        homicidio = sum(homicidio), .by=ano) ) |>
+  #Taxa de homicídio. Padrão Atlas. A taxa somente com uma casa decimal.
+  mutate(tx_homic = format(round((homicidio/pop)*100000,digits = 1) ) |> as.double() ) -> base
+rm(homic,pop_pnadc)
+
+
+
+#Tabela formato wide nº de homicídios
+base |> select(ano,name_muni,homicidio) |>
+  
+  pivot_wider(names_from = ano, values_from = homicidio) %>%  
+  
+  #Variações
+  mutate(
+    
+    #Anual
+    "{names(.)[ncol(.)-1]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[ncol(.)-1]]) / .[[ncol(.)-1]] * 100, 1), decimal.mark = ","), 
+    
+    #Cinco anos
+    "{names(.)[7]} a {names(.)[ncol(.)]} " := 
+      format(round((.[[ncol(.)]] - .[[7]]) / .[[7]] * 100, 1), decimal.mark = ","),
+    
+    #Dez anos 
+    "{names(.)[2]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[2]]) / .[[2]] * 100, 1), decimal.mark = ",") ) |>
+  
+  #Ordenando a linha de população seguindo a ordem do atlas.
+  slice(match(c("Capitais", "Porto Velho", "Rio Branco", "Manaus", "Boa Vista", "Belém", "Macapá", "Palmas",
+                "São Luís", "Teresina", "Fortaleza", "Natal", "João Pessoa", "Recife", "Maceió", "Aracaju", "Salvador",
+                "Cuiabá", "Campo Grande", "Goiânia", "Distrito Federal",
+                "Belo Horizonte", "Vitória", "Rio De Janeiro", "São Paulo",
+                "Curitiba", "Florianópolis", "Porto Alegre"), name_muni) ) |>
+  # Converte as colunas numéricas para caracteres e substitui pontos por vírgulas.
+  #Assim fica mais fácil converter para numérico no excel.
+  mutate(across(where(is.numeric), ~ str_replace_all(as.character(.), "\\.", ","))) |>
+  #Necessário para colocar o título
+  #as_tibble() |>
+  #Nota de rodapé
+  add_row(
+    name_muni = "Fonte: MS/SVSA/CGIAE - Sistema de Informações sobre Mortalidade - SIM. Elaboração: Diest/Ipea e FBSP. Nota: O número de homicídios na capital de residência foi obtido pela soma das seguintes CIDs 10: X85-Y09 e Y35 - Y36, ou seja, óbitos causados por agressão, intervenção legal e operações de guerra. O número de negros foi obtido pela soma de pardos e pretos.") |>
+  #Título da Tabela
+  adorn_title(placement = "top", row_name = "",
+              col_name = glue::glue("Número de Homicídios registrados de negros, por Capitais {min(year)}–{max(year)}") ) |> 
+  #Exportando tabela.
+  rio::export(x = _, "base/n_homicidio_negro_capitais.xlsx")
+
+
+#Taxa de homicídio negros nas capitais
+base |> select(ano,name_muni,tx_homic) |>
+  
+  pivot_wider(names_from = ano, values_from = tx_homic) %>%  
+  
+  #Variações
+  mutate(
+    
+    #Anual
+    "{names(.)[ncol(.)-1]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[ncol(.)-1]]) / .[[ncol(.)-1]] * 100, 1), decimal.mark = ","), 
+    
+    #Cinco anos
+    "{names(.)[7]} a {names(.)[ncol(.)]} " := 
+      format(round((.[[ncol(.)]] - .[[7]]) / .[[7]] * 100, 1), decimal.mark = ","),
+    
+    #Dez anos 
+    "{names(.)[2]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[2]]) / .[[2]] * 100, 1), decimal.mark = ",") ) |>
+  
+  #Ordenando a linha de população seguindo a ordem do atlas.
+  slice(match(c("Capitais", "Porto Velho", "Rio Branco", "Manaus", "Boa Vista", "Belém", "Macapá", "Palmas",
+                "São Luís", "Teresina", "Fortaleza", "Natal", "João Pessoa", "Recife", "Maceió", "Aracaju", "Salvador",
+                "Cuiabá", "Campo Grande", "Goiânia", "Distrito Federal",
+                "Belo Horizonte", "Vitória", "Rio De Janeiro", "São Paulo",
+                "Curitiba", "Florianópolis", "Porto Alegre"), name_muni) ) |>
+  # Converte as colunas numéricas para caracteres e substitui pontos por vírgulas.
+  #Assim fica mais fácil converter para numérico no excel.
+  mutate(across(where(is.numeric), ~ str_replace_all(as.character(.), "\\.", ","))) |>
+  #Necessário para colocar o título
+  #as_tibble() |>
+  #Nota de rodapé
+  add_row(
+    name_muni = "Fonte: IBGE - Pesquisa Nacional por Amostra de Domicílios Contínua (PNADc) e MS/SVSA/CGIAE - Sistema de Informações sobre Mortalidade - SIM. Elaboração: Diest/Ipea e FBSP. Nota: O número de homicídios na capital de residência foi obtido pela soma das seguintes CIDs 10: X85-Y09 e Y35 - Y36, ou seja, óbitos causados por agressão, intervenção legal e operações de guerra. O número de negros foi obtido pela soma de pardos e pretos.") |>
+  #Título da Tabela
+  adorn_title(placement = "top", row_name = "",
+              col_name = glue::glue("Taxa de Homicídios registrados de negros, por Capitais {min(year)}–{max(year)}") ) |> 
+  #Exportando tabela.
+  rio::export(x = _, "base/taxa_homicidio_negro_capitais.xlsx")
+
+rm(list = ls() )
+
 
