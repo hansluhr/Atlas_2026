@@ -2338,4 +2338,123 @@ rm(list = ls())
 
 
 
+# Seção Idosos SIM --------------------------------------------------------
+library(tidyverse)
+library(janitor)
+#Pasta raiz
+here::i_am("Rotinas/Tabelas Padrão - Atlas 2026.R") 
+#Importação base de interesse
+load(paste0(dirname(getwd()),"/bases/sim/RData/sim_doext_14_24.Rdata"))
+year <- c(2014:2024)
+
+
+#Homicídio idoso raça\cor
+sim_doext |> 
+  #Refazendo raçacor e acrescentando racacor negra e não negra nos microdado do SIM 
+  mutate(def_racacor = replace_values(def_racacor, 
+                              c("Parda","Preta") ~ "Negro",
+                              c("Amarela","Branca","Indigena") ~ "Não Negro") |> as_factor() ) |> 
+  #Filtro das características desejadas
+  filter(idade>=60 & intencao_homic == "Homicídio") |> 
+  #Contagem das características desejadas. .drop = FALSE mantém contagens zero na tabela.
+  count(ano,def_sexo,def_racacor, name = "Homicídio", .drop = FALSE ) |> 
+  #Filtro para eliminar anos, sexo e racacor não investigada.
+  filter(def_racacor != "Ignorado" & def_sexo != "Ignorado") |> 
+  #Deixando racacor igual ao informando em pop_pnadc_idoso
+  mutate(def_racacor =  case_when(def_sexo == "Homem" & def_racacor == "Não Negro" ~ "h_nao_negro",
+                              def_sexo == "Homem" & def_racacor == "Negro" ~ "h_negro",
+                              def_sexo == "Mulher"& def_racacor == "Não Negro" ~ "m_nao_negra",
+                              def_sexo == "Mulher" & def_racacor == "Negro" ~ "m_negra",.default = def_racacor) |> as_factor()) |>
+  #Mantém variáveis utilizadas
+  select(ano,def_racacor,Homicídio) -> homic
+
+
+#Quedas raça cor
+#cid10 de quedas é w00 a w19
+sim_doext |> 
+  #Refazendo raçacor e acrescentando def_racacor negra e não negra nos microdado so SIM 
+  mutate(def_racacor = case_match(def_racacor,
+                              c("Parda","Preta") ~ "Negro",
+                              c("Amarela","Branca","Indigena") ~ "Não Negro",.default = def_racacor) |> as_factor()) |> 
+  #Filtro das características desejadas
+  filter(idade>=60 & (causa_letra == "W" & causa_num %in% c(0:19))) |> #cid10 de quedas é w00 a w19
+  #Contagem das características desejadas. .drop = FALSE mantém contagens zero na tabela.
+  count(ano,def_sexo,def_racacor, name = "Queda", .drop = FALSE ) |> 
+  #Filtro para eliminar anos, def_sexo e def_racacor não investigada. 
+  filter(def_racacor != "Ignorado" & def_sexo != "Ignorado") |>
+  #Deixando def_racacor igual ao informando em pop_pnadc_idoso
+  mutate(def_racacor =  case_when(
+                              def_sexo == "Homem" & def_racacor == "Não Negro" ~ "h_nao_negro",
+                              def_sexo == "Homem" & def_racacor == "Negro" ~ "h_negro",
+                              def_sexo == "Mulher"& def_racacor == "Não Negro" ~ "m_nao_negra",
+                              def_sexo == "Mulher" & def_racacor == "Negro" ~ "m_negra",.default = def_racacor) |> as_factor()) |>
+  #Mantém variáveis utilizadas
+  select(ano,def_racacor,Queda) -> queda
+
+
+#Acidente de trânsito
+#Cid 10 de sinistro de trânsito é V01 a V99
+sim_doext |>
+  #Refazendo raçacor e acrescentando def_racacor negra e não negra nos microdado do SIM 
+  mutate(def_racacor = case_match(def_racacor, c("Parda","Preta") ~ "Negro",
+                              c("Amarela","Branca","Indigena") ~ "Não Negro",.default = def_racacor) |> as_factor()) |> 
+  #Filtro das características desejadas
+  filter(idade>=60 & def_racacor != "Ignorado" & (causa_letra == "V" & causa_num %in% c(0:99))) |> #cid10 de acidente transporte é V01 a V99
+  #Contagem das características desejadas. .drop = FALSE mantém contagens zero na tabela.
+  count(ano,def_sexo,def_racacor, name = "trans", .drop = FALSE ) |> 
+  #Filtro para eliminar anos, def_sexo e def_racacor não investigada. 
+  filter(def_racacor != "Ignorado" & def_sexo != "Ignorado") |> 
+  #Deixando def_racacor igual ao informando em pop_pnadc_idoso
+  mutate(def_racacor =  case_when(def_sexo == "Homem" & def_racacor == "Não Negro" ~ "h_nao_negro",
+                              def_sexo == "Homem" & def_racacor == "Negro" ~ "h_negro",
+                              def_sexo == "Mulher"& def_racacor == "Não Negro" ~ "m_nao_negra",
+                              def_sexo == "Mulher" & def_racacor == "Negro" ~ "m_negra",.default = def_racacor) |> as_factor()) |>
+  #Mantém variáveis utilizadas
+  select(ano,def_racacor,trans) -> trans
+
+#Importando população de idosos.
+#Caminho do excel com pnadc
+excel_pnadc <- paste0(dirname(getwd()),"/bases/populacao/Pop-PNADc-60+.xlsx") 
+
+#Importação e empilhando os últimos dez anos da PNADc
+pop_pnadc <- map_dfr(
+  #Tail informa que desejamos os últimos dez anos da pnadc
+  .x = tail(readxl::excel_sheets(excel_pnadc), 11),
+  
+  ~ readxl::read_excel(path = excel_pnadc, sheet = .x) ) |>
+  
+  #Selecionando população homem negro, homem não negro, mulher negro e mulher não negro
+  select(uf=UF,ano, h_negro = H.Negro, h_nao_negro = H.Não_Negra, m_negra = M.Negro, m_nao_negra = M.Não_Negra) |>
+  
+  #Excluindo as regiões. Não utilizado
+  filter(!(uf %in% c("Norte","Centro Oeste","Nordeste","Sudeste","Sul") ) ) |>
+  
+  mutate(
+    ano = ano |> as_factor()) |> 
+  
+  #Formato Long para facilitar o join
+  pivot_longer(cols = !c(uf,ano), names_to = "def_racacor", names_transform = list(def_racacor = as.factor),
+               values_to = "pop_pnadc") |>
+  
+  #População Brasil
+  summarise(pop_pnadc = sum(pop_pnadc), .by = c(ano,def_racacor) )  
+rm(excel_pnadc)
+
+
+#Join de população, homicídio, Quedas e acidetne de transporte
+list(pop_pnadc,homic,queda,trans) %>% reduce(left_join, by = c("ano","def_racacor")) |>
+  #Taxas de homicídio, Acidente e Transporte IDOSO. Padrão Atlas, somente um casa decimal.
+  mutate(across(c(Homicídio, Queda, trans), ~ round((./pop_pnadc)*100000,1),.names="tx_{col}")) |>
+  #Mantém variáveis utilizadas
+  select(ano,def_racacor,starts_with("tx")) -> base
+rm(homic,queda,trans,pop_pnadc)
+
+#Exportação das taxas de interesse
+base |>
+  mutate(def_racacor = def_racacor |> fct_relevel("h_negro","h_nao_negro","m_negra","m_nao_negra")) |>
+  arrange(def_racacor) |> 
+  pivot_longer(cols = starts_with("tx"), names_to = "taxas") |>
+  pivot_wider(names_from = ano, values_from = "value") |>
+  arrange(taxas) |>
+  rio::export(x = _, "base/tx_homic_queda_acide_idoso.xlsx")
 
