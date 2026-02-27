@@ -2120,3 +2120,147 @@ base |>
         legend.background = element_rect(fill = "transparent", colour = NA) ) + 
   labs(x="", y = "Taxas de Homicídio", color = "")
 ggsave(filename ="Figuras/tx_homic_geralxindg.bmp",width = 8,height = 5,device='bmp', dpi=150)
+
+rm(list = ls() )
+
+
+# Suicídio Indígena -------------------------------------------------------
+#Pasta raiz
+here::i_am("Rotinas/Tabelas Padrão - Atlas 2026.R") 
+#Importação base de interesse
+load(paste0(dirname(getwd()),"/bases/sim/RData/sim_doext_14_24.Rdata"))
+year <- c(2014:2024)
+
+#Contagem de suicídios registrados, por ano e UF
+sim_doext |> 
+  
+  #Filtro das intenções de interesse.
+  filter(intencao_homic == "Suicídio" & def_racacor %in% c("Indigena") ) |>
+  
+  #Poderia adcionar total brasil. Mas precisa adicionar brasil na pop. Vou acrescentar Brasil após juntas as bases.
+  count(ano, cod_uf_resd, def_uf_resd, name = "suic") |>
+  #SIM duckdb
+  mutate(cod_uf_resd = cod_uf_resd |> as.integer() ) -> suic
+
+
+##Importando população de indígenas
+#Caminho do excel com pnadc
+excel_pnadc <- paste0(dirname(getwd()),"/bases/populacao/Pop_Geral_UFs_PNADc.xlsx")
+
+#Importação e empilhando os últimos dez anos da PNADc
+pop_pnadc <- map_dfr(
+  #Tail informa que desejamos os últimos dez anos da pnadc
+  .x = tail(readxl::excel_sheets(excel_pnadc), 11),
+  
+  ~ readxl::read_excel(path = excel_pnadc, sheet = .x) ) |>
+  
+  #Selecionando população indígena
+  select(uf = UF,ano, pop = Pop.Indígena)
+rm(excel_pnadc)
+
+#Tratamento base com população PNADc
+pop_pnadc |> 
+  #Excluindo as regiões. Não utilizado
+  filter(!(uf %in% c("Norte","Centro Oeste","Nordeste","Sudeste","Sul"))) |>
+  #Incluindo código das UFs
+  mutate(cod_ibge = recode(uf, "Rondônia" = 11,"Acre" = 12, "Amazonas" = 13, "Roraima" = 14, "Pará" = 15, "Amapá" = 16,
+                           "Maranhão" = 21, "Piauí" = 22, "Ceará" = 23, "Rio Grande do Norte" = 24, "Paraíba" = 25, 
+                           "Pernambuco" = 26, "Alagoas" = 27, "Sergipe" = 28, "Bahia" = 29, "Minas Gerais" = 31,
+                           "Espírito Santo" = 32, "Rio de Janeiro" = 33, "São Paulo" = 35, "Paraná" = 41, "Santa Catarina" = 42,
+                           "Rio Grande do Sul" = 43, "Mato Grosso do Sul" = 50, "Mato Grosso" = 51, "Goiás" = 52,
+                           "Distrito Federal" = 53, "Tocantins" = 17), .before=uf,
+         #Transofrmando em factor variáveis desejadas
+         ano = ano |> as_factor(),
+         uf = uf |> as_factor() ) -> pop_pnadc
+
+#Join homicídios e população. 
+#Fiz o full, pois algumas UFs apresentam contagem de suicídio zero e não aparecem no count.
+full_join(x = suic, y = pop_pnadc, by = join_by("ano","cod_uf_resd" == "cod_ibge","def_uf_resd" == "uf") ) |>
+  #O código da UF não é mais necessário
+  select(!c(cod_uf_resd) ) |> 
+  #Colocando zero nas UFs sem suicídio indígena no ano
+  mutate(suic = replace_na(suic,0) ) -> base
+rm(suic,pop_pnadc)
+
+#Acrescentando total Brasil e criando taxas
+base %>%
+  bind_rows(. |>
+              summarise(def_uf_resd="Brasil" |> as.factor(),
+                        pop = sum(pop),
+                        suic = sum(suic), .by=ano) ) |> 
+  #Taxa de suicídio de indígenas Padrão Atlas. A taxa somente com uma casa decimal.
+  mutate(tx_suic = format(round((suic/pop)*100000,digits = 1) ) |> as.double() ) -> base
+
+#Tabela formato wide do número de homicídios de não negros
+base |> select(ano,def_uf_resd,suic) |>
+  pivot_wider(names_from = ano, values_from = suic, values_fill = 0) %>%
+  #Variações
+  mutate(
+    #Anual
+    "{names(.)[ncol(.)-1]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[ncol(.)-1]]) / .[[ncol(.)-1]] * 100, 1), decimal.mark = ","), 
+    
+    #Cinco anos
+    "{names(.)[7]} a {names(.)[ncol(.)]} " := 
+      format(round((.[[ncol(.)]] - .[[7]]) / .[[7]] * 100, 1), decimal.mark = ","),
+    
+    #Dez anos 
+    "{names(.)[2]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[2]]) / .[[2]] * 100, 1), decimal.mark = ",") )  |>
+  
+  #Ordenando a linha da tabela seguindo o padrão Atlas.
+  slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
+                "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
+                "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
+                "Sergipe","Tocantins"),def_uf_resd) ) |>
+  # Converte as colunas numéricas para caracteres e substitui pontos por vírgulas.
+  #Assim fica mais fácil converter para numérico no excel.
+  mutate(across(where(is.numeric), ~ str_replace_all(as.character(.), "\\.", ","))) %>%
+  #Nota de rodapé
+  add_row(
+    def_uf_resd = "Fonte: MS/SVSA/CGIAE - Sistema de Informações sobre Mortalidade - SIM. Elaboração: Diest/Ipea e FBSP. Nota: O número de suicídios na UF de residência foi obtido pela soma das seguintes CIDs 10: X60-X84, ou seja, lesões autoprovocadas voluntariamente.") |>
+  #Título da Tabela
+  adorn_title(placement = "top", row_name = "",
+              col_name = glue::glue("Suicídio de indígenas, por UF {min(year)}–{max(year)}") ) |> 
+    #Exportando tabela.
+  rio::export(x = _ ,"base/n_ind_suic_uf_br.xlsx")
+
+
+#Tabela formato wide da taxa de suicídios de indígenas
+base |> select(ano, def_uf_resd, tx_suic) |>
+  pivot_wider(names_from = ano, values_from = tx_suic, values_fill = 0) %>%
+  #Variações
+  mutate(
+    #Anual
+    "{names(.)[ncol(.)-1]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[ncol(.)-1]]) / .[[ncol(.)-1]] * 100, 1), decimal.mark = ","), 
+    
+    #Cinco anos
+    "{names(.)[7]} a {names(.)[ncol(.)]} " := 
+      format(round((.[[ncol(.)]] - .[[7]]) / .[[7]] * 100, 1), decimal.mark = ","),
+    
+    #Dez anos 
+    "{names(.)[2]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[2]]) / .[[2]] * 100, 1), decimal.mark = ",") )  |>
+  
+  #Ordenando a linha da tabela seguindo o padrão Atlas.
+  slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
+                "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
+                "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
+                "Sergipe","Tocantins"),def_uf_resd) ) |>
+  # Converte as colunas numéricas para caracteres e substitui pontos por vírgulas.
+  #Assim fica mais fácil converter para numérico no excel.
+  mutate(across(where(is.numeric), ~ str_replace_all(as.character(.), "\\.", ","))) %>%
+  #Nota de rodapé
+  add_row(
+    def_uf_resd = "Fonte: IBGE - Pesquisa Nacional por Amostra de Domicílios Contínua (PNADc) e MS/SVSA/CGIAE - Sistema de Informações sobre Mortalidade - SIM. Elaboração: Diest/Ipea e FBSP. Nota: O número de suicídios na UF de residência foi obtido pela soma das seguintes CIDs 10: X60-X84, ou seja, lesões autoprovocadas voluntariamente.") |>
+  #Título da Tabela
+  adorn_title(placement = "top", row_name = "",
+              col_name = glue::glue("Taxa de suicídio de indígenas, por UF {min(year)}–{max(year)}") ) |> 
+  #Exportando tabela.
+  rio::export(x= _ ,"base/tx_ind_suic_uf_br.xlsx")
+rm(base, sim_doext)
+
+
+
+
