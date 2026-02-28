@@ -3096,10 +3096,11 @@ sim_doext |>
   mutate(p_acid_moto = round( (n_acid_moto/n_acid_terres)*100, 1),
          ufs = case_when(def_uf_resd == "Brasil" ~ "Brasil",
                          .default = "Outros") ) |>
-  
-  filter(ano == 2024) -> base
+    filter(ano == 2024) -> base
 
 #Gráfico da proporção de mortes por acidente de motocicleta no total de acidentes de terrestres.
+  filter(ano == 2023) -> base
+
 base |>
   
   ggplot() +
@@ -3113,10 +3114,12 @@ base |>
   
   scale_x_continuous(
     labels = scales::label_percent(scale = 1, decimal.mark = ",", accuracy = 0.1) ) +
-  
+
   labs(x = "", y = "") + 
   
   theme(axis.text.y = element_text(face = "bold") )
+
+  labs(x = "", y = "")
 
 
 ggsave(filename ="Figuras/p_acid_moto.bmp",width = 11,height = 8,device='bmp', dpi=150)
