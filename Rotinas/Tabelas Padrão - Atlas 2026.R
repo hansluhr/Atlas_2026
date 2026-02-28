@@ -2640,3 +2640,495 @@ base |> select(ano, def_uf_resd, prop) |>
   rio::export(x= _ ,"base/prop_homicidio_PAF_uf_br.xlsx")
 
 rm(base, sim_doext)
+
+
+
+
+# Acidente de Transporte terrestre ----------------------------------------
+library(tidyverse)
+library(janitor)
+#Pasta raiz
+here::i_am("Rotinas/Tabelas Padrão - Atlas 2026.R") 
+#Importação base de interesse
+load(paste0(dirname(getwd()),"/bases/sim/RData/sim_doext_14_24.Rdata"))
+year <- c(2014:2024)
+
+
+#Contagem de sinistros no transporte terrestre
+sim_doext |>
+  filter(
+    #V01-V09 Pedestre traumatizado em um acidente de transporte
+    (causa_letra == "V" & causa_num %in% c(0:9) ) |
+    #V10-V19 Ciclista traumatizado em um acidente de transporte
+    (causa_letra == "V" & causa_num %in% c(10:19) ) |
+    #V20-V29 Motociclista traumatizado em um acidente de transporte
+    (causa_letra == "V" & causa_num %in% c(20:29) ) |
+    #V30-V39 Ocupante de triciclo motorizado traumatizado em um acidente de transporte
+    (causa_letra == "V" & causa_num %in% c(30:39) ) |
+    #V40-V49 Ocupante de um automóvel traumatizado em um acidente de transporte
+    (causa_letra == "V" & causa_num %in% c(40:49) ) |
+    #V50-V59 Ocupante de uma caminhonete traumatizado em um acidente de transporte
+    (causa_letra == "V" & causa_num %in% c(50:59) ) |
+    #V60-V69 Ocupante de um veículo de transporte pesado traumatizado em um acidente de transporte
+    (causa_letra == "V" & causa_num %in% c(60:69) ) |
+    #V70-V79 Ocupante de um ônibus traumatizado em um acidente de transporte
+    (causa_letra == "V" & causa_num %in% c(70:79) ) |
+    #V80-V89 Outros acidentes de transporte terrestre
+    (causa_letra == "V" & causa_num %in% c(80:89) ) ) |>
+
+  #Poderia adcionar total brasil. Mas precisa adicionar brasil na pop. Vou acrescentar Brasil após juntas as bases.
+  count(ano, cod_uf_resd, def_uf_resd, name = "acid_terres") |> 
+  #SIM duckdb
+  mutate(cod_uf_resd = cod_uf_resd |> as.integer() ) -> acid_terres
+
+##Importando população.
+#Caminho do excel com pnadc
+excel_pnadc <- paste0(dirname(getwd()),"/bases/populacao/Pop_Geral_UFs_PNADc.xlsx")
+
+#Importação e empilhando os últimos dez anos da PNADc
+pop_pnadc <- map_dfr(
+  #Tail informa que desejamos os últimos dez anos da pnadc
+  .x = tail(readxl::excel_sheets(excel_pnadc), 11),
+  
+  ~ readxl::read_excel(path = excel_pnadc, sheet = .x) ) |>
+  
+  #Selecionando população geral
+  select(uf = UF,ano, pop = Pop)
+rm(excel_pnadc)
+
+#Tratamento base com população PNADc
+pop_pnadc |> 
+  #Excluindo as regiões. Não utilizado
+  filter(!(uf %in% c("Norte","Centro Oeste","Nordeste","Sudeste","Sul"))) |>
+  #Incluindo código das UFs
+  mutate(cod_ibge = recode(uf, "Rondônia" = 11,"Acre" = 12, "Amazonas" = 13, "Roraima" = 14, "Pará" = 15, "Amapá" = 16,
+                           "Maranhão" = 21, "Piauí" = 22, "Ceará" = 23, "Rio Grande do Norte" = 24, "Paraíba" = 25, 
+                           "Pernambuco" = 26, "Alagoas" = 27, "Sergipe" = 28, "Bahia" = 29, "Minas Gerais" = 31,
+                           "Espírito Santo" = 32, "Rio de Janeiro" = 33, "São Paulo" = 35, "Paraná" = 41, "Santa Catarina" = 42,
+                           "Rio Grande do Sul" = 43, "Mato Grosso do Sul" = 50, "Mato Grosso" = 51, "Goiás" = 52,
+                           "Distrito Federal" = 53, "Tocantins" = 17), .before=uf,
+         #Transofrmando em factor variáveis desejadas
+         ano = ano |> as_factor(),
+         uf = uf |> as_factor() ) -> pop_pnadc
+
+#Join homicídios e população.  
+left_join(x = acid_terres, y = pop_pnadc, by = join_by("ano","cod_uf_resd" == "cod_ibge","def_uf_resd" == "uf") ) |>
+  #O código da UF não é mais necessário
+  select(!c(cod_uf_resd) ) -> base
+rm(acid_terres,pop_pnadc)
+
+#Acrescentando total Brasil e criando taxa e proporção
+base %>%
+  bind_rows(. |>
+              summarise(def_uf_resd="Brasil" |> as.factor(),
+                        pop = sum(pop),
+                        acid_terres = sum(acid_terres), .by = c(ano) ) ) |> 
+  #Taxa de homicídio. Padrão Atlas. A taxa somente com uma casa decimal.
+  mutate(tx_acid_terres = format(round((acid_terres/pop)*100000,digits = 1) ) |> as.double() ) -> base
+
+#Tabela formato wide do número de homicídios por arma de fogo.
+base |> select(ano,def_uf_resd,acid_terres) |>
+  
+  pivot_wider(names_from = ano, values_from = acid_terres, values_fill = 0) %>%
+  #Variações
+  mutate(
+    
+    #Anual
+    "{names(.)[ncol(.)-1]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[ncol(.)-1]]) / .[[ncol(.)-1]] * 100, 1), decimal.mark = ","), 
+    
+    #Cinco anos
+    "{names(.)[7]} a {names(.)[ncol(.)]} " := 
+      format(round((.[[ncol(.)]] - .[[7]]) / .[[7]] * 100, 1), decimal.mark = ","),
+    
+    #Dez anos 
+    "{names(.)[2]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[2]]) / .[[2]] * 100, 1), decimal.mark = ",") )  |>
+  
+  #Ordenando a linha da tabela seguindo o padrão Atlas.
+  slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
+                "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
+                "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
+                "Sergipe","Tocantins"),def_uf_resd) ) |>
+  # Converte as colunas numéricas para caracteres e substitui pontos por vírgulas.
+  #Assim fica mais fácil converter para numérico no excel.
+  mutate(across(where(is.numeric), ~ str_replace_all(as.character(.), "\\.", ","))) %>%
+  #Nota de rodapé
+  add_row(
+    def_uf_resd = "Fonte: MS/SVSA/CGIAE - Sistema de Informações sobre Mortalidade - SIM. Elaboração: Diest/Ipea e FBSP. Nota: O número de acidentes na UF de residência foi obtido pela soma das seguintes CIDs 10: V01-V89, ou seja, sinistros envolvendo pedestres, ciclistas, motociclitas, ocupantes de triciclo, automóvel, caminhonete,  veículo de transporte pesado, ônibus ou outros veículos terrestres não especificados.") |>
+  #Título da Tabela
+  adorn_title(placement = "top", row_name = "",
+              col_name = glue::glue("Mortes no transporte terrestre, por UF {min(year)}–{max(year)}") ) |> 
+  #Exportando tabela.
+  rio::export(x = _ ,"base/n_transp_terres_uf_resd.xlsx")
+
+
+             #Figura Número de Mortes no transporte terrestre#
+base |>
+ 
+  filter(def_uf_resd == "Brasil") |>
+  
+  mutate(ano = ano |> make_date() ) |>
+  #Gráfico
+  ggplot() +
+  
+  geom_line(aes(x = ano, y = acid_terres), linetype = "longdash", 
+            lineend = "round", linejoin = "round", linewidth = 0.5) + 
+  
+  geom_point(aes(x = ano, y = acid_terres) ) +
+  
+  ggrepel::geom_text_repel(aes(x = ano, y = acid_terres,
+                           label = scales::number(acid_terres, big.mark = ".", decimal.mark = ",") ), 
+                           size = 3.5, show.legend = FALSE) +
+  
+  scale_y_continuous(
+  breaks = seq(32000,44000,2000),  
+    
+  labels = scales::label_number(big.mark = ".", decimal.mark = ",") ) +
+  
+  scale_x_date(breaks = scales::breaks_width("1 year"), labels = scales::label_date("'%y") ) +
+  
+  theme(axis.text.x=element_text(size=8),axis.text.y=element_text(size=8),
+        axis.title.x=element_text(size=8),axis.title.y=element_text(size=8) ) +
+  
+  labs(x = "Ano", y = "Número de mortes no transporte terrestre")
+ggsave(filename ="Figuras/n_acid_terres.bmp",width = 8,height = 5,device='bmp', dpi=150)
+
+
+
+
+
+#Tabela formato wide da taxa de homicídios por Arma de fogo.
+base |> select(ano, def_uf_resd, tx_acid_terres) |>
+  
+  pivot_wider(names_from = ano, values_from = tx_acid_terres, values_fill = 0) %>%
+  #Variações
+  
+  mutate(
+    #Anual
+    "{names(.)[ncol(.)-1]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[ncol(.)-1]]) / .[[ncol(.)-1]] * 100, 1), decimal.mark = ","), 
+    
+    #Cinco anos
+    "{names(.)[7]} a {names(.)[ncol(.)]} " := 
+      format(round((.[[ncol(.)]] - .[[7]]) / .[[7]] * 100, 1), decimal.mark = ","),
+    
+    #Dez anos 
+    "{names(.)[2]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[2]]) / .[[2]] * 100, 1), decimal.mark = ",") )  |>
+  
+  #Ordenando a linha da tabela seguindo o padrão Atlas.
+  slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
+                "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
+                "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
+                "Sergipe","Tocantins"),def_uf_resd) ) |>
+  
+  # Converte as colunas numéricas para caracteres e substitui pontos por vírgulas.
+  #Assim fica mais fácil converter para numérico no excel.
+  mutate(across(where(is.numeric), ~ str_replace_all(as.character(.), "\\.", ","))) %>%
+  #Nota de rodapé
+  add_row(
+    def_uf_resd = "Fonte: IBGE - Pesquisa Nacional por Amostra de Domicílios Contínua (PNADc) e MS/SVSA/CGIAE - Sistema de Informações sobre Mortalidade - SIM. Elaboração: Diest/Ipea e FBSP. Nota: O número de acidentes na UF de residência foi obtido pela soma das seguintes CIDs 10: V01-V89, ou seja, sinistros envolvendo pedestres, ciclistas, motociclitas, ocupantes de triciclo,automóvel, caminhonete,  veículo de transporte pesado, ônibus ou outros veículos terrestres não especificados.") |>
+  #Título da Tabela
+  adorn_title(placement = "top", row_name = "",
+              col_name = glue::glue("Taxa de acidentes no transporte terrestre, por UF {min(year)}–{max(year)}") ) |>
+  #Exportando tabela.
+  rio::export(x= _ ,"base/taxa_transp_terres_uf_br.xlsx")
+
+
+           #Figura Taxa de mortes no transporte terrestre#
+base |>
+  
+  filter(def_uf_resd == "Brasil") |>
+  
+  mutate(ano = ano |> make_date() ) |>
+  #Gráfico
+  ggplot() +
+  
+  geom_line(aes(x = ano, y = tx_acid_terres), linetype = "longdash", 
+            lineend = "round", linejoin = "round", linewidth = 0.5) + 
+  
+  geom_point(aes(x = ano, y = tx_acid_terres) ) +
+  
+  ggrepel::geom_text_repel(aes(x = ano, y = tx_acid_terres,
+                               label = scales::number(tx_acid_terres, big.mark = ".", decimal.mark = ",") ), 
+                           size = 3.5, show.legend = FALSE) +
+  
+  # scale_y_continuous(
+  #   breaks = seq(32000,44000,2000),  
+  #   
+  #   labels = scales::label_number(big.mark = ".", decimal.mark = ",") ) +
+  
+  scale_x_date(breaks = scales::breaks_width("1 year"), labels = scales::label_date("'%y") ) +
+  
+  theme(axis.text.x=element_text(size=8),axis.text.y=element_text(size=8),
+        axis.title.x=element_text(size=8),axis.title.y=element_text(size=8) ) +
+  
+  labs(x = "Ano", y = "Taxa de mortes no transporte terrestre")
+ggsave(filename ="Figuras/taxa_acid_terres.bmp",width = 8,height = 5,device='bmp', dpi=150)
+
+
+
+#Tabela número e taxa de óbitos no transporte terrestre
+base |>
+  
+  filter(def_uf_resd == "Brasil") |> 
+  
+  select(ano,acid_terres,tx_acid_terres) |> 
+  
+  pivot_longer(
+    cols = c(acid_terres, tx_acid_terres), 
+    names_to = "metrica", 
+    values_to = "valor") |>
+ #Ano como coluna
+  pivot_wider(
+    names_from = ano, 
+    values_from = valor) |>
+  rio::export(x = _, "base/transp_terres.xlsx")
+  
+
+
+
+
+# Sinistro de Motocicleta -------------------------------------------------
+library(tidyverse)
+library(janitor)
+#Pasta raiz
+here::i_am("Rotinas/Tabelas Padrão - Atlas 2026.R") 
+#Importação base de interesse
+load(paste0(dirname(getwd()),"/bases/sim/RData/sim_doext_14_24.Rdata"))
+year <- c(2014:2024)
+
+sim_doext |>
+  #V20-V29 Motociclista traumatizado em um acidente de transporte
+  filter(causa_letra == "V" & causa_num %in% c(20:29) ) |>
+  
+  #Poderia adcionar total brasil. Mas precisa adicionar brasil na pop. Vou acrescentar Brasil após juntas as bases.
+  count(ano, cod_uf_resd, def_uf_resd, name = "acid_moto") |> 
+  #SIM duckdb
+  mutate(cod_uf_resd = cod_uf_resd |> as.integer() ) -> acid_moto
+
+##Importando população.
+#Caminho do excel com pnadc
+excel_pnadc <- paste0(dirname(getwd()),"/bases/populacao/Pop_Geral_UFs_PNADc.xlsx")
+
+#Importação e empilhando os últimos dez anos da PNADc
+pop_pnadc <- map_dfr(
+  #Tail informa que desejamos os últimos dez anos da pnadc
+  .x = tail(readxl::excel_sheets(excel_pnadc), 11),
+  
+  ~ readxl::read_excel(path = excel_pnadc, sheet = .x) ) |>
+  
+  #Selecionando população geral
+  select(uf = UF,ano, pop = Pop)
+rm(excel_pnadc)
+
+#Tratamento base com população PNADc
+pop_pnadc |> 
+  #Excluindo as regiões. Não utilizado
+  filter(!(uf %in% c("Norte","Centro Oeste","Nordeste","Sudeste","Sul"))) |>
+  #Incluindo código das UFs
+  mutate(cod_ibge = recode(uf, "Rondônia" = 11,"Acre" = 12, "Amazonas" = 13, "Roraima" = 14, "Pará" = 15, "Amapá" = 16,
+                           "Maranhão" = 21, "Piauí" = 22, "Ceará" = 23, "Rio Grande do Norte" = 24, "Paraíba" = 25, 
+                           "Pernambuco" = 26, "Alagoas" = 27, "Sergipe" = 28, "Bahia" = 29, "Minas Gerais" = 31,
+                           "Espírito Santo" = 32, "Rio de Janeiro" = 33, "São Paulo" = 35, "Paraná" = 41, "Santa Catarina" = 42,
+                           "Rio Grande do Sul" = 43, "Mato Grosso do Sul" = 50, "Mato Grosso" = 51, "Goiás" = 52,
+                           "Distrito Federal" = 53, "Tocantins" = 17), .before=uf,
+         #Transofrmando em factor variáveis desejadas
+         ano = ano |> as_factor(),
+         uf = uf |> as_factor() ) -> pop_pnadc
+
+#Join homicídios e população.  
+left_join(x = acid_moto, y = pop_pnadc, by = join_by("ano","cod_uf_resd" == "cod_ibge","def_uf_resd" == "uf") ) |>
+  #O código da UF não é mais necessário
+  select(!c(cod_uf_resd) ) -> base
+rm(acid_moto,pop_pnadc)
+
+#Acrescentando total Brasil e criando taxa e proporção
+base %>%
+  bind_rows(. |>
+              summarise(def_uf_resd="Brasil" |> as.factor(),
+                        pop = sum(pop),
+                        acid_moto = sum(acid_moto), .by = c(ano) ) ) |> 
+  #Taxa de homicídio. Padrão Atlas. A taxa somente com uma casa decimal.
+  mutate(tx_acid_moto = format(round((acid_moto/pop)*100000,digits = 1) ) |> as.double() ) -> base
+
+
+#Tabela formato atlas. Número de sinistros de moto
+base |> select(ano,def_uf_resd,acid_moto) |>
+  
+  pivot_wider(names_from = ano, values_from = acid_moto, values_fill = 0) %>%
+  #Variações
+  mutate(
+    
+    #Anual
+    "{names(.)[ncol(.)-1]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[ncol(.)-1]]) / .[[ncol(.)-1]] * 100, 1), decimal.mark = ","), 
+    
+    #Cinco anos
+    "{names(.)[7]} a {names(.)[ncol(.)]} " := 
+      format(round((.[[ncol(.)]] - .[[7]]) / .[[7]] * 100, 1), decimal.mark = ","),
+    
+    #Dez anos 
+    "{names(.)[2]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[2]]) / .[[2]] * 100, 1), decimal.mark = ",") )  |>
+  
+  #Ordenando a linha da tabela seguindo o padrão Atlas.
+  slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
+                "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
+                "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
+                "Sergipe","Tocantins"),def_uf_resd) ) |>
+  # Converte as colunas numéricas para caracteres e substitui pontos por vírgulas.
+  #Assim fica mais fácil converter para numérico no excel.
+  mutate(across(where(is.numeric), ~ str_replace_all(as.character(.), "\\.", ","))) %>%
+  #Nota de rodapé
+  add_row(
+    def_uf_resd = "Fonte: MS/SVSA/CGIAE - Sistema de Informações sobre Mortalidade - SIM. Elaboração: Diest/Ipea e FBSP. Nota: O número de acidentes na UF de residência foi obtido pela soma das seguintes CIDs 10: V20-V29, ou seja, sinistros envolvendo motociclitas.") |>
+  #Título da Tabela
+  adorn_title(placement = "top", row_name = "",
+              col_name = glue::glue("Número de acidentes de motocicleta, por UF {min(year)}–{max(year)}") ) |>
+  #Exportando tabela.
+  rio::export(x = _ ,"base/n_acid_moto_uf_resd.xlsx")
+
+
+#Tabela Atlas. Taxa de sinistros de moto
+base |> select(ano,def_uf_resd,tx_acid_moto) |>
+  
+  pivot_wider(names_from = ano, values_from = tx_acid_moto, values_fill = 0) %>%
+  #Variações
+  mutate(
+    
+    #Anual
+    "{names(.)[ncol(.)-1]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[ncol(.)-1]]) / .[[ncol(.)-1]] * 100, 1), decimal.mark = ","), 
+    
+    #Cinco anos
+    "{names(.)[7]} a {names(.)[ncol(.)]} " := 
+      format(round((.[[ncol(.)]] - .[[7]]) / .[[7]] * 100, 1), decimal.mark = ","),
+    
+    #Dez anos 
+    "{names(.)[2]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[2]]) / .[[2]] * 100, 1), decimal.mark = ",") )  |>
+  
+  #Ordenando a linha da tabela seguindo o padrão Atlas.
+  slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
+                "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
+                "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
+                "Sergipe","Tocantins"),def_uf_resd) ) |>
+  # Converte as colunas numéricas para caracteres e substitui pontos por vírgulas.
+  #Assim fica mais fácil converter para numérico no excel.
+  mutate(across(where(is.numeric), ~ str_replace_all(as.character(.), "\\.", ","))) %>%
+  #Nota de rodapé
+  add_row(
+    def_uf_resd = "Fonte: IBGE - Pesquisa Nacional por Amostra de Domicílios Contínua (PNADc) e MS/SVSA/CGIAE - Sistema de Informações sobre Mortalidade - SIM. Elaboração: Diest/Ipea e FBSP. Nota: O número de acidentes na UF de residência foi obtido pela soma das seguintes CIDs 10: V20-V29, ou seja, sinistros envolvendo motociclitas.") |>
+  #Título da Tabela
+  adorn_title(placement = "top", row_name = "",
+              col_name = glue::glue("Taxa de acidentes de motocicleta, por UF {min(year)}–{max(year)}") ) |>
+  #Exportando tabela.
+  rio::export(x = _ ,"base/tx_acid_moto_uf_resd.xlsx")
+
+
+
+
+# Percentual de óbitos envolvendo acidentes com motocicletas em relação ao acidentes terrestres --------
+library(tidyverse)
+library(janitor)
+#Pasta raiz
+here::i_am("Rotinas/Tabelas Padrão - Atlas 2026.R") 
+#Importação base de interesse
+load(paste0(dirname(getwd()),"/bases/sim/RData/sim_doext_14_24.Rdata"))
+year <- c(2014:2024)
+
+
+#Contagem de sinistros no transporte terrestre
+sim_doext |>
+  filter(
+    #V01-V09 Pedestre traumatizado em um acidente de transporte
+    (causa_letra == "V" & causa_num %in% c(0:9) ) |
+      #V10-V19 Ciclista traumatizado em um acidente de transporte
+      (causa_letra == "V" & causa_num %in% c(10:19) ) |
+      #V20-V29 Motociclista traumatizado em um acidente de transporte
+      (causa_letra == "V" & causa_num %in% c(20:29) ) |
+      #V30-V39 Ocupante de triciclo motorizado traumatizado em um acidente de transporte
+      (causa_letra == "V" & causa_num %in% c(30:39) ) |
+      #V40-V49 Ocupante de um automóvel traumatizado em um acidente de transporte
+      (causa_letra == "V" & causa_num %in% c(40:49) ) |
+      #V50-V59 Ocupante de uma caminhonete traumatizado em um acidente de transporte
+      (causa_letra == "V" & causa_num %in% c(50:59) ) |
+      #V60-V69 Ocupante de um veículo de transporte pesado traumatizado em um acidente de transporte
+      (causa_letra == "V" & causa_num %in% c(60:69) ) |
+      #V70-V79 Ocupante de um ônibus traumatizado em um acidente de transporte
+      (causa_letra == "V" & causa_num %in% c(70:79) ) |
+      #V80-V89 Outros acidentes de transporte terrestre
+      (causa_letra == "V" & causa_num %in% c(80:89) ) ) |>
+  
+  #Poderia adcionar total brasil. Mas precisa adicionar brasil na pop. Vou acrescentar Brasil após juntas as bases.
+  count(ano, cod_uf_resd, def_uf_resd, name = "n_acid_terres") |>   
+  
+  select(ano,def_uf_resd, n_acid_terres) %>%
+  
+  #Acrescenta Total Brasil
+  bind_rows(. |>
+              summarise(def_uf_resd="Brasil" |> as.factor(),
+                        n_acid_terres = sum(n_acid_terres), .by = c(ano) ) ) -> acid_terres
+
+#Acidentes de motocicleta  
+sim_doext |>
+  
+  filter(
+    
+      #V20-V29 Motociclista traumatizado em um acidente de transporte
+      causa_letra == "V" & causa_num %in% c(20:29) )   |>
+  
+  #Poderia adcionar total brasil. Mas precisa adicionar brasil na pop. Vou acrescentar Brasil após juntas as bases.
+  count(ano, def_uf_resd, name = "n_acid_moto") %>%
+  
+  #Acrescenta Total Brasil
+  bind_rows(. |>
+              summarise(def_uf_resd="Brasil" |> as.factor(),
+                        n_acid_moto = sum(n_acid_moto), .by = c(ano) ) ) |>
+
+  #Join com o total de acidentes terrestres
+  left_join(x = _, 
+            y = acid_terres, by = join_by("ano","def_uf_resd") ) |>
+  
+  #Proporção de acidentes de moto
+  mutate(p_acid_moto = round( (n_acid_moto/n_acid_terres)*100, 1),
+         ufs = case_when(def_uf_resd == "Brasil" ~ "Brasil",
+                         .default = "Outros") ) |>
+  
+  filter(ano == 2023) -> base
+
+
+base |>
+  
+  ggplot() +
+  
+  geom_col(aes(x = p_acid_moto, y = fct_reorder(.f = def_uf_resd, .x = p_acid_moto),
+               fill = ufs), show.legend = FALSE ) +
+  
+  geom_text(aes(x = p_acid_moto, y = def_uf_resd, 
+                label = paste0(scales::number(p_acid_moto, big.mark = ".", decimal.mark = ","), "%"),
+                hjust = -0.3), size = 3 ) +
+  
+  scale_x_continuous(
+    labels = scales::label_percent(scale = 1, decimal.mark = ",", accuracy = 0.1) ) +
+  
+  labs(x = "", y = "")
+
+
+ggsave(filename ="Figuras/p_acid_moto.bmp",width = 11,height = 8,device='bmp', dpi=150)
+
+
+
+
+
+
+ggrepel::geom_text_repel(
+
+
+
+
+# Sinistros em outros meios de transporte ---------------------------------
+
+
