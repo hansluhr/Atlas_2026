@@ -1,15 +1,18 @@
 library(tidyverse)
 library(janitor)
 
-###Importação de todos os arquivos - Usei na ideia de futebol e viol?ncia dom?stica###
+#Pasta raiz
+here::i_am("Rotinas/SINAN_transtorno_atlas_2026.R")
+###Importação de todos os arquivos 
 #Pasta com os arquivos
-filenames <- list.files("C:/Users/p224552695/Desktop/r/Sinan/dbc",full.names = TRUE,pattern=".dbc")
+filenames <- list.files(paste0(dirname(getwd()),"/bases/sinan_violencia/dbc"),
+                        full.names = TRUE,pattern=".dbc")
 #Lista dos arquivos
 list_data <- lapply(filenames, read.dbc::read.dbc)
 #Bind da lista de dbcs
-sinan <- data.table::rbindlist(list_data, use.names = TRUE,fill=TRUE ) %>% clean_names()
-rm(filenames,list_data)
-gc()
+sinan <- data.table::rbindlist(list_data, use.names = TRUE, fill=TRUE ) %>% clean_names()
+rm(filenames,list_data); gc()
+beepr::beep()
 
 
 # Tratamento da base ------------------------------------------------------
@@ -854,7 +857,7 @@ sinan %>% tabyl(ano_not,rel_sexual, show_na = T,show_missing_levels=T)
 # Tabelas LGBT ------------------------------------------------------------
 library(knitr)
 
-year <- 2023
+year <- 2024
 
 ###Características vitima
 #Raça\cor
