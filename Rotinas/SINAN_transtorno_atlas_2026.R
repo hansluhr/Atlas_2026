@@ -1312,10 +1312,11 @@ sinan %>% filter(def_mental == "Sim" & grupo_viol!="Autoprovocada") %>%
 sinan %>% filter(def_visual == "Sim" & grupo_viol!="Autoprovocada") %>%
   count(ano_not, name = "Visual"), by = join_by("ano_not") ) |>
   
-  pivot_longer(cols = !c(ano_not), names_to = "def", values_to = "value", names_transform = list(def = as_factor)) |>
+  pivot_longer(cols = !c(ano_not), names_to = "def", values_to = "value", names_transform = list(def = as_factor)) -> base
   
+
+base |>
   #Gráfico
-  
   ggplot() + 
   geom_line(aes(x = ano_not, y = value, color = def, group = def) ) +
   
@@ -1325,21 +1326,19 @@ sinan %>% filter(def_visual == "Sim" & grupo_viol!="Autoprovocada") %>%
                                color = def ), seed = 747,
                            show.legend = FALSE, force = 10 ) +
   
-  #scale_x_continuous(breaks = seq(2012,2022,1) ) +
+  scale_y_continuous(breaks = seq(1000,6000,1000) ) +
+  
   guides(color = guide_legend(position = "inside", nrow = 2)) +
-  theme(legend.position.inside = c(0.15,0.8),
+  theme(legend.position.inside = c(0.2,0.8),
         axis.text.x=element_text(size=10),axis.text.y=element_text(size=10),
         axis.title.x=element_text(size=5.75),axis.title.y=element_text(size=7),
         legend.text = element_text(size = 10,face="bold"),
         legend.key = element_rect(fill = "transparent", colour = NA),
         legend.background = element_rect(fill = "transparent", colour = NA) ) +
   labs(x = "", y = "", color = "")
-ggsave(filename ="evolucao_defs.bmp",width = 8,height = 5,device='bmp', dpi=150)
-ggsave(filename ="evolucao_defs.eps",width = 8,height = 5,device='bmp', dpi=150)
 
-
-
-
+ggsave(filename ="base/pcd/figuras/evolucao_defs.bmp",width = 8,height = 5,device='bmp', dpi=150)
+ggsave(filename ="base/pcd/figuras/evolucao_defs.eps",width = 8,height = 5,device='bmp', dpi=150)
 
 
 
