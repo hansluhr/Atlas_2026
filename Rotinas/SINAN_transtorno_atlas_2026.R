@@ -856,8 +856,13 @@ sinan %>% tabyl(ano_not,rel_sexual, show_na = T,show_missing_levels=T)
 
 # Tabelas LGBT ------------------------------------------------------------
 library(knitr)
+library(tidyverse)
+library(janitor)
 
-year <- 2024
+here::i_am("Rotinas/SINAN_transtorno_atlas_2026.R")
+#Carrgando base SINAN Violência
+load(paste0(dirname(getwd()),"/bases/sinan_violencia/sinan_14_24_transtorno.Rdata") )
+year <- 2024;gc()
 
 ###Características vitima
 #Raça\cor
@@ -867,7 +872,7 @@ sinan %>% filter(ano_not == year & grupo_viol!="Autoprovocada" & cs_raca!="Missi
   adorn_percentages(denominator = "all") %>% adorn_pct_formatting(digits = 1,affix_sign=FALSE) %>%
   arrange(desc(Total)) %>% #ordem das linhas seguindo o atlas.
   select("orient_sex","Branco","Preto","Amarelo","Pardo","Indígena","Ignorado","Total") %>% #ordem das colunas seguindo o atlas.
-  rio::export(.,"Raça por orientação sexual da vítima.xlsx")
+  rio::export(.,"base/lgbt/base/Raça por orientação sexual da vítima.xlsx")
   #kable(caption = "Orientação Sexual x Raça/Cor",format = "simple")
 
 
@@ -878,7 +883,7 @@ sinan %>% filter(ano_not == year & grupo_viol!="Autoprovocada" &
   adorn_percentages(denominator = "all") %>%  adorn_pct_formatting(digits = 1,affix_sign=FALSE) %>%
   arrange(desc(Total)) %>% #ordem das linhas seguindo o atlas.
   select("orient_sex","Masculino","Feminino","Ambos os sexos","Ignorado","Total") %>% #ordem das colunas seguindo o atlas.
-  rio::export(.,"Sexo do autor da violência segundo orientação sexual da vítima.xlsx")
+  rio::export(.,"base/lgbt/base/Sexo do autor da violência segundo orientação sexual da vítima.xlsx")
   #kable(caption = "Orientação Sexual x Sexo do Autor",format = "simple")
 
 #Zona de residência - ACHO QUE ZONA SÓ EXISTE NO ARQUIVO ENVIADO PELO MS
@@ -892,7 +897,7 @@ sinan %>% filter((ano_not == year & grupo_viol!="Autoprovocada" & sit_conjug!="M
   adorn_percentages(denominator = "all") %>%  adorn_pct_formatting(digits = 1,affix_sign = FALSE) %>% 
   arrange(desc(Total)) %>% #ordem linhas do atlas
   select("orient_sex","Solteiro","Casado-União consensual","Viúvo","Separado","Não se aplica","Ignorado","Total") %>% #ordem coluna atlas.
-  rio::export(.,"Situação conjugal segundo orientação sexual da vítima.xlsx")
+  rio::export(.,"base/lgbt/base/Situação conjugal segundo orientação sexual da vítima.xlsx")
   #kable(caption = "orientação sexual x Sitaução conjugal",format = "simple")
 
 #sexo da vítima
@@ -902,7 +907,7 @@ sinan %>% filter((ano_not == year &  grupo_viol!="Autoprovocada") &
   adorn_percentages(denominator = "all") %>%  adorn_pct_formatting(digits = 1,affix_sign = FALSE) %>%
   arrange(desc(Total)) %>% #ordem linhas do atlas
   select("orient_sex","F","I","M","Total") %>% #Pode conter sexo indeterminado - Verficar. #Ordem das colunas.
-  rio::export(.,"Sexo da vítima segundo orientação sexual.xlsx")
+  rio::export(.,"base/lgbt/base/Sexo da vítima segundo orientação sexual.xlsx")
   kable(caption = "Orientação Sexual x Sexo da Vítima",format = "simple")
 
 
@@ -943,7 +948,8 @@ sinan %>% filter(ano_not == year &
                    (orient_sex == "Heterossexual"| orient_sex == "Homossexual (gay-lésbica)" | orient_sex == "Bissexual")) %>% 
   tabyl(fxetlgbt,orient_sex,show_na = TRUE, show_missing_levels = FALSE) %>% adorn_totals(where=c("col","row")) %>% 
   adorn_percentages(denominator = "col") %>% adorn_pct_formatting(digits = 1,affix_sign = FALSE) %>% 
-  select("fxetlgbt","Heterossexual","Homossexual (gay-lésbica)","Bissexual") %>% #rio::export(.,"Faixa etária x Orientação Sexual.xlsx")
+  select("fxetlgbt","Heterossexual","Homossexual (gay-lésbica)","Bissexual") %>% 
+  rio::export(.,"base/lgbt/base/Faixa etária x Orientação Sexual.xlsx")
  #kable(caption = "Faixa etária x Orientação Sexual",format = "simple") 
 
 
@@ -955,8 +961,9 @@ sinan %>% filter(ano_not == year &
                    grupo_viol!="Autoprovocada") %>% 
   tabyl(fxetlgbt,ident_gen,show_na = TRUE, show_missing_levels = FALSE) %>% adorn_totals(where=c("row")) %>%
   adorn_percentages(denominator = "col") %>% adorn_pct_formatting(digits = 1,affix_sign = FALSE) %>% 
-  select("fxetlgbt","Travesti","Transexual Mulher","Transexual Homem") %>% #rio::export(.,"Identidade de gênero por faixa etária lgbt.xlsx") %>%
-  kable(caption = "Faixa etária x Identidade de gênero",format = "simple")
+  select("fxetlgbt","Travesti","Transexual Mulher","Transexual Homem") %>%
+  rio::export(.,"base/lgbt/base/Identidade de gênero por faixa etária lgbt.xlsx") 
+  #kable(caption = "Faixa etária x Identidade de gênero",format = "simple")
 
 
 #Perfil orientação sexual por raça/cor
@@ -966,8 +973,8 @@ sinan %>% filter(ano_not == year & (grupo_viol!="Autoprovocada"  & cs_raca!="Mis
   adorn_percentages(denominator = "col") %>% adorn_pct_formatting(digits = 1,affix_sign = FALSE) %>% 
   select("cs_raca","Heterossexual","Homossexual (gay-lésbica)","Bissexual","Total") %>% #ordem das colunas atlas
   arrange(match(cs_raca,c("Branco","Preto","Amarelo","Pardo","Indígena","Ignorado","Total"))) %>% #ordem das linhas atlas.
-  #rio::export(.,"orientação sexual por raça.xlsx") %>%
-  kable(caption = "Orietação Sexual x Raça/Cor",format = "simple")
+  rio::export(.,"base/lgbt/base/orientação sexual por raça.xlsx") 
+  #kable(caption = "Orietação Sexual x Raça/Cor",format = "simple")
 
 
 
@@ -979,8 +986,8 @@ sinan %>% filter(ano_not == year &
   adorn_percentages(denominator = "col") %>% adorn_pct_formatting(digits = 1,affix_sign = FALSE) %>% 
   select("cs_raca","Travesti","Transexual Mulher","Transexual Homem","Total") %>% #ordem das colunas atlas
   arrange(match(cs_raca,c("Branco","Preto","Amarelo","Pardo","Indígena","Ignorado","Total"))) %>% #ordem das linhas atlas.
-  #rio::export(.,"identidade de genêro por raça.xlsx") %>%
-  kable(caption = "Identidade de Gênero x Raça/Cor",format = "simple")
+  rio::export(.,"base/lgbt/base/identidade de genêro por raça.xlsx")
+  #kable(caption = "Identidade de Gênero x Raça/Cor",format = "simple")
 
 
 #Número de registros de violência contra trans e travestis
@@ -994,14 +1001,14 @@ sinan %>% filter(grupo_viol!="Autoprovocada" &
 sinan %>% select(dt_notific,dt_ocor,id_municip,id_unidade,orient_sex,viol_fisic:viol_espec,viol_motiv,grupo_viol) %>% 
   mutate(ano = lubridate::year(dt_notific), #Ano de notificação
          ano_ocor = lubridate::year(dt_ocor)) %>% #Ano de ocorrência.
-  filter(ano == 2022 & orient_sex == "Homossexual (gay-lésbica)" & grupo_viol!= "Autoprovocada") %>% 
-  droplevels() -> base2022
+  filter(ano == 2023 & orient_sex == "Homossexual (gay-lésbica)" & grupo_viol!= "Autoprovocada") %>% 
+  droplevels() -> base2023
 
 sinan %>% select(dt_notific,dt_ocor,id_municip,id_unidade,orient_sex,viol_fisic:viol_espec,viol_motiv,grupo_viol) %>% 
   mutate(ano = lubridate::year(dt_notific), #Ano de notificação
          ano_ocor = lubridate::year(dt_ocor)) %>% #Ano de ocorrência.
-  filter(ano == 2023 & orient_sex == "Homossexual (gay-lésbica)" & grupo_viol!= "Autoprovocada") %>% 
-  droplevels() -> base2023
+  filter(ano == 2024 & orient_sex == "Homossexual (gay-lésbica)" & grupo_viol!= "Autoprovocada") %>% 
+  droplevels() -> base2024
 
 #Agressão por município
 base2017 %>% tabyl(id_municip,show_na = T,show_missing_levels = T)%>% 
@@ -1023,50 +1030,50 @@ tabyl(base2019,orient_sex)
 tabyl(base2020,orient_sex)
 
 #Seleciona municípios que constam nas duas bases - Atlerar os anos com mudanças de atlas.
-base2022 %>% filter(id_municip != "") -> b1 #Seleciona municípios conhecidos.
-base2023 %>% filter(id_municip != "") -> b2
+base2023 %>% filter(id_municip != "") -> b1 #Seleciona municípios conhecidos.
+base2024 %>% filter(id_municip != "") -> b2
 #x <- semi_join(base2018,base2017, by = "id_municip", keep = TRUE) #Mantém todos os municípios observados em 2018 com ocorrência em 2017.
 vetor_municipios = intersect(b1$id_municip,b2$id_municip) #Seleciona municípios que constam nas duas bases.
 rm(b1,b2)
 #Criando bases com municípios comuns entre os anos.
 #base_municipios_2019 <- base2018 %>% filter(id_municip %in% vetor_municipios)
-base_municipios_2023 <- base2022 %>% filter(id_municip %in% vetor_municipios)
+base_municipios_2024 <- base2023 %>% filter(id_municip %in% vetor_municipios)
 
 #Municípios conhecidos (Brutos)
-tabyl(base2023 %>% filter(id_municip != ""),orient_sex) %>% adorn_totals(where = c("row", "col"))
+tabyl(base2024 %>% filter(id_municip != ""),orient_sex) %>% adorn_totals(where = c("row", "col"))
 #Municípios iguais ao do período anterior.(Mesmos Municípios)
-tabyl(base_municipios_2023, orient_sex) %>% adorn_totals(where = c("row", "col"))
-rm(vetor_municipios,base_municipios_2023)
+tabyl(base_municipios_2024, orient_sex) %>% adorn_totals(where = c("row", "col"))
+rm(vetor_municipios,base_municipios_2024)
 
 
 #Criando bases com unidades de saúde comuns entre os anos.
 #Seleciona unidades que constam nas duas bases - Alterar os anos a medida que o altas avançar.
-base2022 %>% filter(id_unidade != "") -> b1 #Seleciona unidades de saúde conhecidas.
-base2023 %>% filter(id_unidade != "") -> b2
+base2023 %>% filter(id_unidade != "") -> b1 #Seleciona unidades de saúde conhecidas.
+base2024 %>% filter(id_unidade != "") -> b2
 vetor_unidade = intersect(b1$id_unidade,b2$id_unidade)
 rm(b1,b2)
 #Criando bases com unidades comuns entre os anos.
-base_unidades_2023 <- base2022 %>% filter(id_unidade %in% vetor_unidade)
+base_unidades_2024 <- base2023 %>% filter(id_unidade %in% vetor_unidade)
 
 #Unidades conhecidas (Brutos)
 tabyl(base2023 %>% filter(id_unidade != ""),orient_sex) %>% adorn_totals(where = c("row", "col"))
 #Unidades iguais as do período anterior. (Mesma Unidade)
-tabyl(base_unidades_2023, orient_sex) %>%  adorn_totals(where = c("row", "col"))
-rm(vetor_unidade,base_unidades_2023,base2022,base2023)
+tabyl(base_unidades_2024, orient_sex) %>%  adorn_totals(where = c("row", "col"))
+rm(vetor_unidade,base_unidades_2024,base2023,base2024)
 
 
 ####Bissexuais
 sinan %>% select(dt_notific,dt_ocor,id_municip,id_unidade,orient_sex,viol_fisic:viol_espec,viol_motiv,grupo_viol) %>% 
   mutate(ano = lubridate::year(dt_notific), #Ano de notificação
          ano_ocor = lubridate::year(dt_ocor)) %>% #Ano de ocorrência.
-  filter(ano == 2022 & orient_sex == "Bissexual" & grupo_viol!="Autoprovocada") %>%
-  droplevels() -> base2022
+  filter(ano == 2023 & orient_sex == "Bissexual" & grupo_viol!="Autoprovocada") %>%
+  droplevels() -> base2023
 
 sinan %>% select(dt_notific,dt_ocor,id_municip,id_unidade,orient_sex,viol_fisic:viol_espec,viol_motiv,grupo_viol) %>% 
   mutate(ano = lubridate::year(dt_notific), #Ano de notificação
          ano_ocor = lubridate::year(dt_ocor)) %>% #Ano de ocorrência.
-  filter(ano == 2023 & orient_sex == "Bissexual" & grupo_viol!="Autoprovocada") %>%
-  droplevels() -> base2023
+  filter(ano == 2024 & orient_sex == "Bissexual" & grupo_viol!="Autoprovocada") %>%
+  droplevels() -> base2024
 
 
 #Agressão por município
@@ -1087,197 +1094,200 @@ tabyl(base2018,orient_sex)
 tabyl(base2019,orient_sex)
 
 #Seleciona municípios que constam nas duas bases - Atlerar os anos com mudanças de atlas.
-base2022 %>% filter(id_municip != "") -> b1 #Seleciona municípios conhecidos.
-base2023 %>% filter(id_municip != "") -> b2
+base2023 %>% filter(id_municip != "") -> b1 #Seleciona municípios conhecidos.
+base2024 %>% filter(id_municip != "") -> b2
 #x <- semi_join(base2018,base2017, by = "id_municip", keep = TRUE) #Mantém todos os municípios observados em 2018 com ocorrência em 2017.
 vetor_municipios = intersect(b1$id_municip,b2$id_municip) #Seleciona municípios que constam nas duas bases.
 rm(b1,b2)
 #Criando bases com municípios comuns entre os anos.
 #base_municipios_2019 <- base2018 %>% filter(id_municip %in% vetor_municipios)
-base_municipios_2023 <- base2022 %>% filter(id_municip %in% vetor_municipios)
+base_municipios_2024 <- base2023 %>% filter(id_municip %in% vetor_municipios)
 
 #Municípios conhecidos (Brutos)
 tabyl(base2023 %>% filter(id_municip != ""),orient_sex) %>% adorn_totals(where = c("row", "col"))
 #Municípios iguais ao do período anterior. (Mesmos municípios)
-tabyl(base_municipios_2023, orient_sex) %>% adorn_totals(where = c("row", "col"))
-rm(vetor_municipios,base_municipios_2023)
+tabyl(base_municipios_2024, orient_sex) %>% adorn_totals(where = c("row", "col"))
+rm(vetor_municipios,base_municipios_2024)
 
 #Criando bases com unidades de saúde comuns entre os anos.
 #Seleciona unidades que constam nas duas bases - Alterar os anos a medida que o altas avançar.
-base2022 %>% filter(id_municip != "") -> b1 #Seleciona municípios conhecidos.
-base2023 %>% filter(id_municip != "") -> b2
+base2023 %>% filter(id_municip != "") -> b1 #Seleciona municípios conhecidos.
+base2024 %>% filter(id_municip != "") -> b2
 vetor_unidade = intersect(b1$id_unidade,b2$id_unidade)
 rm(b1,b2)
 #Criando bases com unidades comuns entre os anos.
-base_unidades_2023 <- base2022 %>% filter(id_unidade %in% vetor_unidade)
+base_unidades_2024 <- base2023 %>% filter(id_unidade %in% vetor_unidade)
 
 #Unidades conhecidos (Brutos)
-tabyl(base2023 %>% filter(id_unidade != ""),orient_sex) %>% adorn_totals(where = c("row", "col"))
+tabyl(base2024 %>% filter(id_unidade != ""),orient_sex) %>% adorn_totals(where = c("row", "col"))
 #Unidades iguais ao do período anterior. (Mesma Unidade)
-tabyl(base_unidades_2023, orient_sex) %>%  adorn_totals(where = c("row", "col"))
-rm(vetor_unidade,base_unidades_2023,base2022,base2023)
+tabyl(base_unidades_2024, orient_sex) %>%  adorn_totals(where = c("row", "col"))
+rm(vetor_unidade,base_unidades_2024,base2023,base2024)
 
 
 ### Transsexuais e Travestis
 sinan %>% select(dt_notific,dt_ocor,id_municip,id_unidade,ident_gen,viol_fisic:viol_espec,viol_motiv,grupo_viol) %>% 
   mutate(ano = year(dt_notific), #Ano de notificação
          ano_ocor = year(dt_ocor)) %>% #Ano de ocorrência.
-  filter(ano == 2022 & (ident_gen == "Transexual Homem" |ident_gen == "Transexual Mulher" | ident_gen == "Travesti") & 
-           grupo_viol!="Autoprovocada") -> base2022
+  filter(ano == 2023 & (ident_gen == "Transexual Homem" |ident_gen == "Transexual Mulher" | ident_gen == "Travesti") & 
+           grupo_viol!="Autoprovocada") -> base2023
 
 sinan %>% select(dt_notific,dt_ocor,id_municip,id_unidade,ident_gen,viol_fisic:viol_espec,viol_motiv,grupo_viol) %>% 
   mutate(ano = year(dt_notific), #Ano de notificação
          ano_ocor = year(dt_ocor)) %>% #Ano de ocorrência.
-  filter(ano == 2023 & (ident_gen == "Transexual Homem" |ident_gen == "Transexual Mulher" | ident_gen == "Travesti") 
-         & grupo_viol!="Autoprovocada") -> base2023
+  filter(ano == 2024 & (ident_gen == "Transexual Homem" |ident_gen == "Transexual Mulher" | ident_gen == "Travesti") 
+         & grupo_viol!="Autoprovocada") -> base2024
 
 
 #Violência Física - LGBTQI
-base2022 %>% filter(viol_fisic == "Sim" & id_municip!= "") ->b1 #Seleciona municípios com violência física.
-base2023 %>% filter(viol_fisic == "Sim" & id_municip!= "") ->b2
+base2023 %>% filter(viol_fisic == "Sim" & id_municip!= "") ->b1 #Seleciona municípios com violência física.
+base2024 %>% filter(viol_fisic == "Sim" & id_municip!= "") ->b2
 #x <- semi_join(base2018,base2017, by = "id_unidade", keep = TRUE)
 vetor_municipios = intersect(b1$id_municip,b2$id_municip) #Seleciona municípios que constam nas duas bases.
 rm(b1,b2)
 #Criando bases com municípios comuns entre os anos.
 #base_municipios_2018 <- base2018 %>% filter(id_municip %in% vetor_municipios)
-base_municipios_2023 <- base2022 %>% filter(id_municip %in% vetor_municipios)
+base_municipios_2024 <- base2023 %>% filter(id_municip %in% vetor_municipios)
 
 #Municípios conhecidos (Brutos)
-tabyl(base2023 %>% filter(id_municip != "" & viol_fisic == "Sim"),ident_gen) %>%  adorn_totals(where = c("row", "col"))
+tabyl(base2024 %>% filter(id_municip != "" & viol_fisic == "Sim"),ident_gen) %>%  adorn_totals(where = c("row", "col"))
 #Municípios iguais ao do período anterior. (Mesmos Municípios)
-tabyl(base_municipios_2023 %>% filter(viol_fisic == "Sim"),ident_gen) %>%  adorn_totals(where = c("row", "col"))
-rm(vetor_municipios,base_municipios_2023)
+tabyl(base_municipios_2024 %>% filter(viol_fisic == "Sim"),ident_gen) %>%  adorn_totals(where = c("row", "col"))
+rm(vetor_municipios,base_municipios_2024)
 
 #Mesmo unidade - Violência Física - LGBTQI
-base2022 %>% filter(viol_fisic == "Sim" & id_unidade!= "") ->b1 #Seleciona unidades com violência física.
-base2023 %>% filter(viol_fisic == "Sim" & id_unidade!= "") ->b2
+base2023 %>% filter(viol_fisic == "Sim" & id_unidade!= "") ->b1 #Seleciona unidades com violência física.
+base2024 %>% filter(viol_fisic == "Sim" & id_unidade!= "") ->b2
 #x <- semi_join(base2018,base2017, by = "id_unidade", keep = TRUE)
 vetor_unidades = intersect(b1$id_unidade,b2$id_unidade) #Seleciona unidades que constam nas duas bases.
 rm(b1,b2)
 #Criando bases com unidades comuns entre os anos.
 #base_unidades_2019 <- base2018 %>% filter(id_unidade %in% vetor_unidades)
-base_unidades_2023 <- base2022 %>% filter(id_unidade %in% vetor_unidades)
+base_unidades_2024 <- base2023 %>% filter(id_unidade %in% vetor_unidades)
 
 #Unidades conhecidos (Brutos)
-tabyl(base2023 %>% filter(id_unidade != "" & viol_fisic == "Sim"),ident_gen) %>%  adorn_totals(where = c("row", "col"))
+tabyl(base2024 %>% filter(id_unidade != "" & viol_fisic == "Sim"),ident_gen) %>%  adorn_totals(where = c("row", "col"))
 #Municípios iguais ao do período anterior. (Mesma Unidade)
-tabyl(base_unidades_2023 %>% filter(viol_fisic == "Sim"),ident_gen) %>%  adorn_totals(where = c("row", "col"))
-rm(vetor_unidades,base_unidades_2023)#Não apagar baseano1 e baseano2. Será usado a frente.
+tabyl(base_unidades_2024 %>% filter(viol_fisic == "Sim"),ident_gen) %>%  adorn_totals(where = c("row", "col"))
+rm(vetor_unidades,base_unidades_2024)#Não apagar baseano1 e baseano2. Será usado a frente.
 
 
 
 #Violência psicológica - LGBTQI
-base2022 %>% filter(viol_psico == "Sim" & id_municip!= "") ->b1 #Seleciona municípios com violência física.
-base2023 %>% filter(viol_psico == "Sim" & id_municip!= "") ->b2
+base2023 %>% filter(viol_psico == "Sim" & id_municip!= "") ->b1 #Seleciona municípios com violência física.
+base2024 %>% filter(viol_psico == "Sim" & id_municip!= "") ->b2
 #x <- semi_join(base2018,base2017, by = "id_unidade", keep = TRUE)
 vetor_municipios = intersect(b1$id_municip,b2$id_municip) #Seleciona municípios que constam nas duas bases.
 rm(b1,b2)
 #Criando bases com municípios comuns entre os anos.
 #base_municipios_2019 <- base2018 %>% filter(id_municip %in% vetor_municipios)
-base_municipios_2023 <- base2022 %>% filter(id_municip %in% vetor_municipios)
+base_municipios_2024 <- base2023 %>% filter(id_municip %in% vetor_municipios)
 
 #Municípios conhecidos (Brutos)
-tabyl(base2023 %>% filter(id_municip != "" & viol_psico == "Sim"),ident_gen) %>%  adorn_totals(where = c("row", "col"))
+tabyl(base2024 %>% filter(id_municip != "" & viol_psico == "Sim"),ident_gen) %>%  adorn_totals(where = c("row", "col"))
 #Municípios iguais ao do período anterior. (Mesmos municípios)
-tabyl(base_municipios_2023 %>% filter(viol_psico == "Sim"),ident_gen) %>%  adorn_totals(where = c("row", "col"))
-rm(vetor_municipios,base_municipios_2023)
+tabyl(base_municipios_2024 %>% filter(viol_psico == "Sim"),ident_gen) %>%  adorn_totals(where = c("row", "col"))
+rm(vetor_municipios,base_municipios_2024)
 
 
 #Mesma unidade - Violência psicológica - LGBTQI
-base2022 %>% filter(viol_psico == "Sim" & id_unidade!= "") ->b1 #Seleciona municípios com violência física.
-base2023 %>% filter(viol_psico == "Sim" & id_unidade!= "") ->b2
+base2023 %>% filter(viol_psico == "Sim" & id_unidade!= "") ->b1 #Seleciona municípios com violência física.
+base2024 %>% filter(viol_psico == "Sim" & id_unidade!= "") ->b2
 #x <- semi_join(base2018,base2017, by = "id_unidade", keep = TRUE)
 vetor_unidades = intersect(b1$id_unidade,b2$id_unidade) #Seleciona municípios que constam nas duas bases.
 rm(b1,b2)
 #Criando bases com Unidades comuns entre os anos.
 #base_unidades_2019 <- base2018 %>% filter(id_unidade %in% vetor_unidades)
-base_unidades_2023 <- base2022 %>% filter(id_unidade %in% vetor_unidades)
+base_unidades_2024 <- base2023 %>% filter(id_unidade %in% vetor_unidades)
 
 #Unidades conhecidos (Brutas)
-tabyl(base2023 %>% filter(id_unidade != "" & viol_psico == "Sim"),ident_gen) %>%  adorn_totals(where = c("row", "col"))
+tabyl(base2024 %>% filter(id_unidade != "" & viol_psico == "Sim"),ident_gen) %>%  adorn_totals(where = c("row", "col"))
 #Unidades iguais ao do período anterior. (Memsma unidade)
-tabyl(base_unidades_2023 %>% filter(viol_psico == "Sim"),ident_gen) %>%  adorn_totals(where = c("row", "col"))
-rm(vetor_unidades,base_unidades_2023)
+tabyl(base_unidades_2024 %>% filter(viol_psico == "Sim"),ident_gen) %>%  adorn_totals(where = c("row", "col"))
+rm(vetor_unidades,base_unidades_2024)
 
 
 
 #Tortura - LGBTQI 
-base2022 %>% filter(viol_tort == "Sim" & id_municip!= "") ->b1 #Seleciona municípios com violência física.
-base2023 %>% filter(viol_tort == "Sim" & id_municip!= "") ->b2
+base2023 %>% filter(viol_tort == "Sim" & id_municip!= "") ->b1 #Seleciona municípios com violência física.
+base2024 %>% filter(viol_tort == "Sim" & id_municip!= "") ->b2
 #x <- semi_join(base2019,base2018, by = "id_unidade", keep = TRUE)
 vetor_municipios = intersect(b1$id_municip,b2$id_municip) #Seleciona municípios que constam nas duas bases.
 rm(b1,b2)
 #Criando bases com municípios comuns entre os anos.
 #base_municipios_2019 <- base2018 %>% filter(id_municip %in% vetor_municipios)
-base_municipios_2023 <- base2022 %>% filter(id_municip %in% vetor_municipios)
+base_municipios_2024 <- base2023 %>% filter(id_municip %in% vetor_municipios)
 
 #Municípios conhecidos (Brutos)
-tabyl(base2023 %>% filter(id_municip != "" & viol_tort == "Sim"),ident_gen) %>%  adorn_totals(where = c("row", "col"))
+tabyl(base2024 %>% filter(id_municip != "" & viol_tort == "Sim"),ident_gen) %>%  adorn_totals(where = c("row", "col"))
 #Municípios iguais ao do período anterior. (Mesmos municípios)
-tabyl(base_municipios_2023 %>% filter(viol_tort == "Sim"),ident_gen) %>%  adorn_totals(where = c("row", "col"))
-rm(vetor_municipios,base_municipios_2023)
+tabyl(base_municipios_2024 %>% filter(viol_tort == "Sim"),ident_gen) %>%  adorn_totals(where = c("row", "col"))
+rm(vetor_municipios,base_municipios_2024)
 
 #Mesmo Unidade - Tortura - LGBTQI 
-base2022 %>% filter(viol_tort == "Sim" & id_unidade!= "") ->b1 #Seleciona municípios com violência física.
-base2023 %>% filter(viol_tort == "Sim" & id_unidade!= "") ->b2
+base2023 %>% filter(viol_tort == "Sim" & id_unidade!= "") ->b1 #Seleciona municípios com violência física.
+base2024 %>% filter(viol_tort == "Sim" & id_unidade!= "") ->b2
 #x <- semi_join(base2019,base2018, by = "id_unidade", keep = TRUE)
 vetor_unidades = intersect(b1$id_unidade,b2$id_unidade) #Seleciona municípios que constam nas duas bases.
 rm(b1,b2)
 #Criando bases com Unidades comuns entre os anos.
 #base_unidades_2019 <- base2018 %>% filter(id_unidade %in% vetor_unidades)
-base_unidades_2023 <- base2022 %>% filter(id_unidade %in% vetor_unidades)
+base_unidades_2024 <- base2023 %>% filter(id_unidade %in% vetor_unidades)
 
 #Unidades conhecidos (Brutos)
-tabyl(base2023 %>% filter(id_unidade != "" & viol_tort == "Sim"),ident_gen) %>%  adorn_totals(where = c("row", "col"))
+tabyl(base2024 %>% filter(id_unidade != "" & viol_tort == "Sim"),ident_gen) %>%  adorn_totals(where = c("row", "col"))
 #Municípios iguais ao do período anterior. (Mesma unidade)
-tabyl(base_unidades_2023 %>% filter(viol_tort == "Sim"),ident_gen) %>%  adorn_totals(where = c("row", "col"))
-rm(vetor_unidades,base_unidades_2023)
+tabyl(base_unidades_2024 %>% filter(viol_tort == "Sim"),ident_gen) %>%  adorn_totals(where = c("row", "col"))
+rm(vetor_unidades,base_unidades_2024)
 
 
 
 #Outros - LGBTQI 
-base2022 %>% filter(id_municip != "" & viol_outr == "Sim") ->b1 #Seleciona municípios com violência física.
-base2023 %>% filter(id_municip != "" & viol_outr == "Sim") ->b2
+base2023 %>% filter(id_municip != "" & viol_outr == "Sim") ->b1 #Seleciona municípios com violência física.
+base2024 %>% filter(id_municip != "" & viol_outr == "Sim") ->b2
 #x <- semi_join(base2019,base2018, by = "id_unidade", keep = TRUE)
 vetor_municipios = intersect(b1$id_municip,b2$id_municip) #Seleciona municípios que constam nas duas bases.
 rm(b1,b2)
 #Criando bases com municípios comuns entre os anos.
 #base_municipios_2019 <- base2018 %>% filter(id_municip %in% vetor_municipios)
-base_municipios_2023 <- base2022 %>% filter(id_municip %in% vetor_municipios)
+base_municipios_2024 <- base2023 %>% filter(id_municip %in% vetor_municipios)
 
 #Municípios conhecidos (Brutos)
-tabyl(base2023 %>% filter(id_municip != "" & viol_outr == "Sim"),ident_gen) %>%  adorn_totals(where = c("row", "col"))
+tabyl(base2024 %>% filter(id_municip != "" & viol_outr == "Sim"),ident_gen) %>%  adorn_totals(where = c("row", "col"))
 #Municípios iguais ao do período anterior. (Mesmos municípios)
-tabyl(base_municipios_2023 %>% filter(viol_outr == "Sim"),ident_gen) %>%  adorn_totals(where = c("row", "col"))
-rm(vetor_municipios,base_municipios_2023)
+tabyl(base_municipios_2024 %>% filter(viol_outr == "Sim"),ident_gen) %>%  adorn_totals(where = c("row", "col"))
+rm(vetor_municipios,base_municipios_2024)
 
 
 ##Mesmo Unidade - Outros - LGBTQI 
-base2022 %>% filter(id_unidade != "" & viol_outr == "Sim") ->b1 #Seleciona municípios com violência física.
-base2023 %>% filter(id_unidade != "" & viol_outr == "Sim") ->b2
+base2023 %>% filter(id_unidade != "" & viol_outr == "Sim") ->b1 #Seleciona municípios com violência física.
+base2024 %>% filter(id_unidade != "" & viol_outr == "Sim") ->b2
 #x <- semi_join(base2019,base2018, by = "id_unidade", keep = TRUE)
 vetor_unidades = intersect(b1$id_unidade,b2$id_unidade) #Seleciona municípios que constam nas duas bases.
 rm(b1,b2)
 #Criando bases com Unidades comuns entre os anos.
 #base_unidades_2019 <- base2018 %>% filter(id_unidade %in% vetor_unidades)
-base_unidades_2023 <- base2022 %>% filter(id_unidade %in% vetor_unidades) 
+base_unidades_2024 <- base2023 %>% filter(id_unidade %in% vetor_unidades) 
 
 #Unidades conhecidos (Brutos)
-tabyl(base2023 %>% filter(id_unidade != "" & viol_outr == "Sim"),ident_gen) %>%  adorn_totals(where = c("row", "col"))
+tabyl(base2024 %>% filter(id_unidade != "" & viol_outr == "Sim"),ident_gen) %>%  adorn_totals(where = c("row", "col"))
 #Unidades iguais ao do período anterior. (Mesmas Unidades)
-tabyl(base_unidades_2023 %>% filter(viol_outr == "Sim"),ident_gen) %>%  adorn_totals(where = c("row", "col"))
-rm(vetor_unidades,base_unidades_2023)
+tabyl(base_unidades_2024 %>% filter(viol_outr == "Sim"),ident_gen) %>%  adorn_totals(where = c("row", "col"))
+rm(vetor_unidades,base_unidades_2024)
 
-rm(base2022,base2023)
+rm(base2023,base2024)
 
 
 
 # Gráfico PCds ------------------------------------------------------------
+library(knitr)
 library(tidyverse)
 library(janitor)
-#Importando base
-load("C:/Users/gabli/Desktop/r/Sinan/sinan_13_2023_preliminar_transtorno.RData")
-year <- 2023
+
+here::i_am("Rotinas/SINAN_transtorno_atlas_2026.R")
+#Carrgando base SINAN Violência
+load(paste0(dirname(getwd()),"/bases/sinan_violencia/sinan_14_24_transtorno.Rdata") )
+year <- 2024;gc()
 
 #Notificações deficiência auditiva
 sinan %>% filter(def_auditi == "Sim" & grupo_viol!="Autoprovocada") %>%
