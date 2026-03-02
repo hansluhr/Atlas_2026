@@ -1914,21 +1914,22 @@ sinan %>% filter(!is.na(idade) & grupo_viol!="Autoprovocada" & ano_not %in% year
   
 
 
-
-
 #Número de violência física contra crianças e adolescentes – Brasil
 sinan |>
   filter(t_viol == "V.Física" & grupo_viol!="Autoprovocada" & ano_not %in% year) |> droplevels() |>
    #Criando faixa etária
   mutate(fxet_eca = as.factor(case_when(
-    idade<=4 ~ "0 a 4",
-    idade>=5 & idade<=14 ~ "5 a 14",
-    idade>=15 & idade<=19 ~ "15 a 19",
+    idade<=4 ~ "0 a 4 anos",
+    idade>=5 & idade<=14 ~ "5 a 14 anos",
+    idade>=15 & idade<=19 ~ "15 a 19 anos",
     TRUE ~ "Outras"))) |>
   #Notificações violência física por ano
   tabyl(fxet_eca,ano_not) |>
   #Ordenando as linhas da tabela
-  slice(match(c("0 a 4", "5 a 14", "15 a 19"),fxet_eca)) |> rio::export(x=_,"eca_viol_fisc_fxet.xlsx")
+  slice(match(c("0 a 4 anos","5 a 14 anos","15 a 19 anos"), fxet_eca)) |>
+  adorn_title(placement = "top", row_name = "Faixa Etária",
+            col_name = glue::glue("Notificações com violência Física, por autoria faixa etária ({min(year)}–{max(year)})") ) |>
+ rio::export(x=_,"base/eca/base/eca_viol_fisc_fxet.xlsx")
 
 
 #Número de violência sexual contra crianças e adolescentes – Brasil 
@@ -1936,14 +1937,17 @@ sinan |>
   filter(t_viol == "V.Sexual" & grupo_viol!="Autoprovocada" & ano_not %in% year) |> droplevels() |>
   #Criando faixa etária
   mutate(fxet_eca = as.factor(case_when(
-    idade<=4 ~ "0 a 4",
-    idade>=5 & idade<=14 ~ "5 a 14",
-    idade>=15 & idade<=19 ~ "15 a 19",
+    idade<=4 ~ "0 a 4 anos",
+    idade>=5 & idade<=14 ~ "5 a 14 anos",
+    idade>=15 & idade<=19 ~ "15 a 19 anos",
     TRUE ~ "Outras"))) |>
   #Notificações violência física por ano
   tabyl(fxet_eca,ano_not) |>
   #Ordenando as linhas da tabela
-  slice(match(c("0 a 4", "5 a 14", "15 a 19"),fxet_eca)) |> rio::export(x=_,"eca_viol_sex_fxet.xlsx")
+  slice(match(c("0 a 4 anos", "5 a 14 anos", "15 a 19 anos"),fxet_eca)) |>
+  adorn_title(placement = "top", row_name = "Faixa Etária",
+              col_name = glue::glue("Notificações com violência Sexual, por autoria faixa etária ({min(year)}–{max(year)})") ) |>
+  rio::export(x=_,"base/eca/base/eca_viol_sex_fxet.xlsx")
 
 
 #Número de violência psicológica contra crianças e adolescentes
@@ -1951,14 +1955,17 @@ sinan |>
   filter(t_viol == "V.Psico" & grupo_viol!="Autoprovocada" & ano_not %in% year) |> droplevels() |>
   #Criando faixa etária
   mutate(fxet_eca = as.factor(case_when(
-    idade<=4 ~ "0 a 4",
-    idade>=5 & idade<=14 ~ "5 a 14",
-    idade>=15 & idade<=19 ~ "15 a 19",
+    idade<=4 ~ "0 a 4 anos",
+    idade>=5 & idade<=14 ~ "5 a 14 anos",
+    idade>=15 & idade<=19 ~ "15 a 19 anos",
     TRUE ~ "Outras"))) |>
   #Notificações violência física por ano
   tabyl(fxet_eca,ano_not) |>
   #Ordenando as linhas da tabela
-  slice(match(c("0 a 4", "5 a 14", "15 a 19"),fxet_eca)) |> rio::export(x=_,"eca_viol_psic_fxet.xlsx")
+  slice(match(c("0 a 4 anos", "5 a 14 anos", "15 a 19 anos"),fxet_eca)) |>
+  adorn_title(placement = "top", row_name = "Faixa Etária",
+              col_name = glue::glue("Notificações com violência Psicológica, por autoria faixa etária ({min(year)}–{max(year)})") ) |>
+  rio::export(x=_,"base/eca/base/eca_viol_psic_fxet.xlsx")
 
 
 #Número de negligência/abandono de crianças e adolescentes por faixa etária
@@ -1966,14 +1973,17 @@ sinan |>
   filter(t_viol == "Negligência" & grupo_viol!="Autoprovocada" & ano_not %in% year) |> droplevels() |>
   #Criando faixa etária
   mutate(fxet_eca = as.factor(case_when(
-    idade<=4 ~ "0 a 4",
-    idade>=5 & idade<=14 ~ "5 a 14",
-    idade>=15 & idade<=19 ~ "15 a 19",
+    idade<=4 ~ "0 a 4 anos",
+    idade>=5 & idade<=14 ~ "5 a 14 anos",
+    idade>=15 & idade<=19 ~ "15 a 19 anos",
     TRUE ~ "Outras"))) |>
   #Notificações violência física por ano
   tabyl(fxet_eca,ano_not) |>
   #Ordenando as linhas da tabela
-  slice(match(c("0 a 4", "5 a 14", "15 a 19"),fxet_eca)) |> rio::export(x=_,"eca_viol_negli_fxet.xlsx")
+  slice(match(c("0 a 4 anos", "5 a 14 anos", "15 a 19 anos"),fxet_eca)) |>
+  adorn_title(placement = "top", row_name = "Faixa Etária",
+              col_name = glue::glue("Notificações com negligência/abandono, por autoria faixa etária ({min(year)}–{max(year)})") ) |>
+ rio::export(x=_,"base/eca/base/eca_viol_negli_fxet.xlsx")
 
 
 
@@ -2003,40 +2013,66 @@ sinan |>
         legend.position.inside = c(0.1, 0.4),legend.direction = "horizontal",
         legend.background = element_rect(fill = "transparent", colour = NA)) + 
   labs(x="",y="",color = "Faixa Etária")
-ggsave(filename = "V. não letal_eca.bmp", width = 15,height = 10,dpi=250)
-ggsave(filename = "V. não letal_eca.eps", width = 15,height = 10,dpi=350)
+ggsave(filename = "base/eca/figura/V. não letal_eca.bmp", width = 15,height = 10,dpi=250)
+ggsave(filename = "base/eca/figura/V. não letal_eca.eps", width = 15,height = 10,dpi=350)
 
 
 #tabela de proporção por sexo.
 sinan |>
   #Criando faixa etária
   mutate(fxet_eca = as.factor(case_when(
-    idade<=4 ~ "0 a 4",
-    idade>=5 & idade<=14 ~ "5 a 14",
-    idade>=15 & idade<=19 ~ "15 a 19",
-    TRUE ~ "Outras"))) |>
+    idade<=4 ~ "0 a 4 anos",
+    idade>=5 & idade<=14 ~ "5 a 14 anos",
+    idade>=15 & idade<=19 ~ "15 a 19 anos",
+    TRUE ~ "Outras")),
+    t_viol = t_viol |> as.character() ) |>
   filter(grupo_viol!="Autoprovocada" & fxet_eca != "Outras" & ano_not %in% year &
            t_viol %in% c("Negligência","V.Física","V.Psico","V.Sexual") ) |> droplevels() |>
   tabyl(t_viol,cs_sexo) %>% adorn_totals(where = c("row","col")) %>%
   adorn_percentages(denominator  = "row") %>% adorn_pct_formatting(digits = 1) %>%
-  adorn_ns(position = "front")
- 
+  adorn_ns(position = "front")  |>
+  #Colocando vírgula no lugar de ponto.
+  mutate(across(where(is.character), ~ str_replace_all(as.character(.x), "\\,", ".") ) )  |>
+  #Nota de rodapé
+  add_row(
+    t_viol = glue::glue("Fonte: Sinan/MS. Elaboração: Diest/Ipea e FBSP. 
+  *Microdados do SINAN referentes a {max(year)} são preliminares e foram coletados em março de {max(year+2)}.") ) |> 
+  #Necessário para o título da tabela
+  as_tibble() |>
+  #Título da tabela
+  adorn_title(placement = "top", row_name = "Tipo de Violência",
+              col_name = glue::glue("Tipos de violência, por sexo da vítima ({min(year)}–{max(year)})") ) |>
+rio::export(x=_,"base/eca/base/eca_t_viol_fxet.xlsx")
 
-
+  
 #tabela de proporção faixa etária
 sinan |>
   #Criando faixa etária
-  mutate(fxet_eca = as.factor(case_when(
-    idade<=4 ~ "0 a 4",
-    idade>=5 & idade<=14 ~ "5 a 14",
-    idade>=15 & idade<=19 ~ "15 a 19",
-    TRUE ~ "Outras"))) |>
+  mutate(fxet_eca = case_when(
+    idade<=4 ~ "0 a 4 anos",
+    idade>=5 & idade<=14 ~ "5 a 14 anos",
+    idade>=15 & idade<=19 ~ "15 a 19 anos",
+    TRUE ~ "Outras") |> as.character() ) |>
   filter(grupo_viol!="Autoprovocada" & fxet_eca != "Outras" & ano_not %in% year &
            t_viol %in% c("Negligência","V.Física","V.Psico","V.Sexual") ) |> droplevels() |>
   tabyl(fxet_eca,t_viol) %>% adorn_totals(where = c("row","col")) %>%
   adorn_percentages(denominator  = "col") %>% adorn_pct_formatting(digits = 1) %>%
-  adorn_ns(position = "front") 
-  
+  adorn_ns(position = "front")  |>
+  #Colocando vírgula no lugar de ponto.
+  mutate(across(where(is.character), ~ str_replace_all(as.character(.x), "\\,", ".") ) )  |>
+  #Nota de rodapé
+  add_row(
+    fxet_eca = glue::glue("Fonte: Sinan/MS. Elaboração: Diest/Ipea e FBSP. 
+  *Microdados do SINAN referentes a {max(year)} são preliminares e foram coletados em março de {max(year+2)}.") ) |> 
+  #Necessário para o título da tabela
+  as_tibble() |>
+  #Título da tabela
+  adorn_title(placement = "top", row_name = "Tipo de Violência",
+              col_name = glue::glue("Tipos de violência, por sexo da vítima ({min(year)}–{max(year)})") ) |>
+  rio::export(x=_,"base/eca/base/eca_fxet_t_viol.xlsx")
+
+
+
 
 
 # Tabelas Agravos de notificações Idosos 60+ -----------------------------------------
