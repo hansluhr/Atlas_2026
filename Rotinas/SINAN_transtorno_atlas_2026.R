@@ -1280,7 +1280,6 @@ rm(base2023,base2024)
 
 
 # Gráfico PCds ------------------------------------------------------------
-library(knitr)
 library(tidyverse)
 library(janitor)
 
@@ -1346,9 +1345,11 @@ ggsave(filename ="base/pcd/figuras/evolucao_defs.eps",width = 8,height = 5,devic
 # Tabelas PcD -------------------------------------------------
 library(tidyverse)
 library(janitor)
-#Importando base
-load("C:/Users/gabli/Desktop/r/Sinan/sinan_13_2023_preliminar_transtorno.RData")
-year <- 2023
+
+here::i_am("Rotinas/SINAN_transtorno_atlas_2026.R")
+#Carrgando base SINAN Violência
+load(paste0(dirname(getwd()),"/bases/sinan_violencia/sinan_14_24_transtorno.Rdata") )
+year <- 2024;gc()
 
 #Cobertura municipal das pessoas com deficiência - Municípios e CNES com ao menos uma notificação
 sinan %>% filter(!is.na(id_municip)|!is.na(id_unidade)) %>%
@@ -1491,7 +1492,7 @@ sinan %>% filter(!is.na(tipodef)) %>%
             V_sexual = sum(v_sexual),
             notificações = n()) %>% 
   arrange(desc(notificações)) %>%  #Ordem tabelas do atlas. 
-  adorn_totals(where = "row") %>% rio::export(x=.,"Tipo de deficiência_Tipo de violência não individualizada_Geral.xlsx")
+  adorn_totals(where = "row") %>% rio::export(x=.,"base/pcd/base/Tipo de deficiência_Tipo de violência não individualizada_Geral.xlsx")
   kable(caption = "Tipo de deficiência x Tipo de violência não individualizada - Geral") 
 
 #tipodef_t_violência-8.4 - Mulher
@@ -1512,7 +1513,7 @@ sinan %>% filter(!is.na(tipodef) & cs_sexo == "F") %>%
             V_sexual = sum(v_sexual),
             notificações = n()) %>% 
   arrange(desc(notificações)) %>% #Ordem tabelas do atlas.
-  adorn_totals(where = "row") %>% rio::export(x=.,"Tipo de deficiência_Tipo de violência não individualizada_mulher.xlsx")
+  adorn_totals(where = "row") %>% rio::export(x=.,"base/pcd/base/Tipo de deficiência_Tipo de violência não individualizada_mulher.xlsx")
   kable(caption = "Tipo de deficiência x Tipo de violência não individualizada - Mulher")
 
 
@@ -1534,7 +1535,7 @@ sinan %>% filter(!is.na(tipodef) & cs_sexo == "M") %>%
             V_sexual = sum(v_sexual),
             notificações = n()) %>% 
   arrange(desc(notificações)) %>% #Ordem tabelas do atlas.
-  adorn_totals(where = "row") %>% rio::export(x=.,"Tipo de deficiência_Tipo de violência não individualizada_homem.xlsx")
+  adorn_totals(where = "row") %>% rio::export(x=.,"base/pcd/base/Tipo de deficiência_Tipo de violência não individualizada_homem.xlsx")
   kable(caption = "Tipo de deficiência x Tipo de violência não individualizada - Homem")
 
 
@@ -1559,7 +1560,8 @@ sinan %>% filter(!is.na(fxet80)) %>%
   # mutate(r_v_fis = round(V_Física/Casos*100,2), #Porcentagens
   #        r_v_Psi = round(V_Psicol/Casos*100,2)) %>%
   pivot_longer(cols = !c("fxet80"),names_to = "variables",values_to = "Violências") %>%
-  pivot_wider(names_from = fxet80,values_from = Violências) %>% rio::export(x=., "t_violxfxet80.xlsx")
+  pivot_wider(names_from = fxet80,values_from = Violências) %>% 
+  rio::export(x=., "base/pcd/base/t_violxfxet80.xlsx")
   kable(caption = "Tipo de Violência x Faixa etária 80 - Geral")
 
 
@@ -1584,7 +1586,8 @@ sinan %>% filter(!is.na(fxet80) & cs_sexo == "F") %>%
   # mutate(r_v_fis = round(V_Física/Casos*100,2), #Porcentagens
   #        r_v_Psi = round(V_Psicol/Casos*100,2)) %>%
   pivot_longer(cols = !c("fxet80"),names_to = "variables",values_to = "Violências") %>%
-  pivot_wider(names_from = fxet80,values_from = Violências) %>% rio::export(x=., "t_violxfxet80_mulher.xlsx")
+  pivot_wider(names_from = fxet80,values_from = Violências) %>% 
+  rio::export(x=., "base/pcd/base/t_violxfxet80_mulher.xlsx")
   kable(caption = "Tipo de Violência x Faixa etária 80 - Mulher")
 
 
@@ -1609,228 +1612,230 @@ sinan %>% filter(!is.na(fxet80) & cs_sexo == "M") %>%
   # mutate(r_v_fis = round(V_Física/Casos*100,2), #Porcentagens
   #        r_v_Psi = round(V_Psicol/Casos*100,2)) %>%
   pivot_longer(cols = !c("fxet80"),names_to = "variables",values_to = "Violências") %>%
-  pivot_wider(names_from = fxet80,values_from = Violências) %>% rio::export(x=., "t_violxfxet80_homem.xlsx") 
+  pivot_wider(names_from = fxet80,values_from = Violências) %>% 
+  rio::export(x=., "base/pcd/base/t_violxfxet80_homem.xlsx") 
   kable(caption = "Tipo de Violência x Faixa etária 80 - Homem")
 
 
 
 # Tabelas violência PcD autoprovocada -------------------------------------
-library(tidyverse)
-library(janitor)
-#Importando base
-load("C:/Users/gabli/Desktop/r/Sinan/sinan_13_2023_preliminar_transtorno.RData")
-
-#Cobertura municipal das pessoas com deficiência - Municípios e CNES com ao menos uma notificação
-sinan %>% filter(!is.na(id_municip)|!is.na(id_unidade)) %>%
-  group_by(ano_not) %>% summarise(Municípios = n_distinct(id_municip),
-                                  CNES = n_distinct(id_unidade)) 
-
-#Notificações pessoas com deficiência	
-sinan %>% filter(def == "Sim" & grupo_viol=="Autoprovocada") %>%
-  tabyl(ano_not,cs_sexo) %>% adorn_totals(where = c("col"))
-
-#Notificações deficiência auditiva
-sinan %>% filter(def_auditi == "Sim" & grupo_viol=="Autoprovocada") %>%
-  tabyl(ano_not,cs_sexo) %>% adorn_totals(where = c("col"))
-
-#Notificações deficiência Física
-sinan %>% filter(def_fisica == "Sim" & grupo_viol=="Autoprovocada") %>%
-  tabyl(ano_not,cs_sexo) %>% adorn_totals(where = c("col"))
-
-
-#Notificações deficiência Intelectual
-sinan %>% filter(def_mental == "Sim" & grupo_viol=="Autoprovocada") %>%
-  tabyl(ano_not,cs_sexo) %>% adorn_totals(where = c("col"))
-
-
-#Notificações deficiência Visual
-sinan %>% filter(def_visual == "Sim" & grupo_viol=="Autoprovocada") %>%
-  tabyl(ano_not,cs_sexo) %>% adorn_totals(where = c("col"))
-
-#TipodefxAgr-8.1
-#tipo de deficiência por grupo agressor - GERAL
-sinan %>% filter(ano_not == 2021 & def=="Sim" & cs_sexo!="I" & grupo_viol=="Autoprovocada") |> 
-  mutate(grupo_viol = fct_drop(grupo_viol), cs_sexo = fct_drop(cs_sexo)) |>
-  tabyl(tipodef,cs_sexo, show_na = F, show_missing_levels = T) |>
-  adorn_totals(where = c("row","col")) |> slice(match(c("Trans. Mental","Múltipla","Física","Intelectual","Auditiva","Visual","Total"), tipodef))
-
-#Gráfico tipo de deficiência agressão autoprovocada.
-sinan %>% filter(ano_not == 2021 & def=="Sim" & cs_sexo!="I" & grupo_viol=="Autoprovocada" & !is.na(tipodef)) |> 
-  mutate(grupo_viol = fct_drop(grupo_viol) ) |>
-  ggplot() +
-  geom_bar(aes(x= cs_sexo, fill =  tipodef)) +
-  #scale_y_continuous(breaks = seq(0,2500,250)) +
-  labs(x="",y="",fill="") 
- 
-###Grupo agressor por faixa etária -  Agrxfxet80-8.3
-#Criando  Faixa etária 80+
-sinan %>% mutate(fxet80 = as.factor(case_when(
-  nu_idade_n<=4009 ~ "0 a 9",
-  nu_idade_n>=4010 & nu_idade_n<=4019 ~ "10 a 19",
-  nu_idade_n>=4020 & nu_idade_n<=4029 ~ "20 a 29",
-  nu_idade_n>=4030 & nu_idade_n<=4039 ~ "30 a 39",
-  nu_idade_n>=4040 & nu_idade_n<=4049 ~ "40 a 49",
-  nu_idade_n>=4050 & nu_idade_n<=4059 ~ "50 a 59",
-  nu_idade_n>=4060 & nu_idade_n<=4069 ~ "60 a 69",
-  nu_idade_n>=4070 & nu_idade_n<=4079 ~ "70 a 79",
-  nu_idade_n>=4080 & !is.na(nu_idade_n) ~    "80 ou mais"))) -> sinan
-
-
-#Cs_sexo por faixa etária 80 - Somente autoprovocada
-sinan %>% filter(ano_not == 2021 & def=="Sim" & cs_sexo!="I" & grupo_viol=="Autoprovocada") |> 
-  mutate(grupo_viol = fct_drop(grupo_viol), cs_sexo = fct_drop(cs_sexo)) |>
-  tabyl(cs_sexo,fxet80, show_na = F, show_missing_levels = T) |>
-  adorn_totals(where = c("row","col")) |> rio::export(x=_,"cs_sexo_x_fxt80.xlsx")
-
-sinan %>% filter(ano_not == 2021 & def=="Sim" & cs_sexo!="I" & grupo_viol=="Autoprovocada" & !is.na(tipodef)) |> 
-  mutate(grupo_viol = fct_drop(grupo_viol) ) |>
-  ggplot() +
-  geom_bar(aes(x= fxet80, fill =  cs_sexo)) +
-  #scale_y_continuous(breaks = seq(0,2500,250)) +
-  labs(x="",y="",fill="") 
-
-###Tipo de deficiência por tipo de violência não individualizada - tipodef_t_violência-8.4
-sinan %>% filter(!is.na(tipodef)) %>%
-  mutate(
-    v_fisica = case_when(viol_fisic =="Sim" ~ 1, TRUE ~ 0),
-    v_psico = case_when(viol_psico=="Sim" | viol_finan=="Sim" ~ 1, TRUE ~ 0),
-    v_sexual = case_when(viol_sexu=="Sim" ~ 1, TRUE ~ 0),
-    v_outro = case_when(viol_outr=="Sim" | viol_legal=="Sim" | viol_infan=="Sim" | 
-                          viol_traf=="Sim" | viol_tort=="Sim" ~ 1, TRUE ~ 0),
-    v_neglig = case_when(viol_negli=="Sim" ~ 1, TRUE ~ 0 )) %>%
-  filter(ano_not == 2021 & def=="Sim" & grupo_viol=="Autoprovocada") %>%
-  group_by(tipodef) %>% 
-  summarise(V_Física = sum(v_fisica),
-            V_Psicol = sum(v_psico),
-            Neglig_aband = sum(v_neglig),
-            Outros = sum(v_outro),
-            V_sexual = sum(v_sexual),
-            notificações = n()) |> 
-  arrange(desc(notificações)) |> #Ordem tabelas do atlas.
-  adorn_totals(where = "row") |> rio::export(x=_,"tipodef_x_tipoviol.xlsx") 
-
-
-#tipodef_t_violência-8.4 - Mulher
-sinan %>% filter(!is.na(tipodef) & cs_sexo == "F") %>%
-  mutate(
-    v_fisica = case_when(viol_fisic =="Sim" ~ 1, TRUE ~ 0),
-    v_psico = case_when(viol_psico=="Sim" | viol_finan=="Sim" ~ 1, TRUE ~ 0),
-    v_sexual = case_when(viol_sexu=="Sim" ~ 1, TRUE ~ 0),
-    v_outro = case_when(viol_outr=="Sim" | viol_legal=="Sim" | viol_infan=="Sim" | 
-                          viol_traf=="Sim" | viol_tort=="Sim" ~ 1, TRUE ~ 0),
-    v_neglig = case_when(viol_negli=="Sim" ~ 1, TRUE ~ 0 )) %>%
-  filter(ano_not == 2021 & def=="Sim" & grupo_viol=="Autoprovocada") %>%
-  group_by(tipodef) %>% 
-  summarise(V_Física = sum(v_fisica),
-            V_Psicol = sum(v_psico),
-            Neglig_aband = sum(v_neglig),
-            Outros = sum(v_outro),
-            V_sexual = sum(v_sexual),
-            notificações = n()) %>% 
-  arrange(desc(notificações)) %>% #Ordem tabelas do atlas.
-  adorn_totals(where = "row") |> rio::export(x=_,"tipodef_x_tipoviol - Mulher.xlsx") 
-
-
-#tipodef_t_violência-8.4 - Homem
-sinan %>% filter(!is.na(tipodef) & cs_sexo == "M") %>%
-  mutate(
-    v_fisica = case_when(viol_fisic =="Sim" ~ 1, TRUE ~ 0),
-    v_psico = case_when(viol_psico=="Sim" | viol_finan=="Sim" ~ 1, TRUE ~ 0),
-    v_sexual = case_when(viol_sexu=="Sim" ~ 1, TRUE ~ 0),
-    v_outro = case_when(viol_outr=="Sim" | viol_legal=="Sim" | viol_infan=="Sim" | 
-                          viol_traf=="Sim" | viol_tort=="Sim" ~ 1, TRUE ~ 0),
-    v_neglig = case_when(viol_negli=="Sim" ~ 1, TRUE ~ 0 )) %>%
-  filter(ano_not == 2021 & def=="Sim" & grupo_viol=="Autoprovocada") %>%
-  group_by(tipodef) %>% 
-  summarise(V_Física = sum(v_fisica),
-            V_Psicol = sum(v_psico),
-            Neglig_aband = sum(v_neglig),
-            Outros = sum(v_outro),
-            V_sexual = sum(v_sexual),
-            notificações = n()) %>% 
-  arrange(desc(notificações)) %>% #Ordem tabelas do atlas.
-  adorn_totals(where = "row") |> rio::export(x=_,"tipodef_x_tipoviol - Homem.xlsx")
-
-
-
-###Tipo de violência x faixa etária 80 - t_violência x fxet80 - 8.5 - Geral
-library(scales)
-sinan %>% filter(!is.na(fxet80)) %>%
-  mutate(
-    v_fisica = case_when(viol_fisic =="Sim" ~ 1, TRUE ~ 0),
-    v_psico = case_when(viol_psico=="Sim" | viol_finan=="Sim" ~ 1, TRUE ~ 0),
-    v_sexual = case_when(viol_sexu=="Sim" ~ 1, TRUE ~ 0),
-    v_outro = case_when(viol_outr=="Sim" | viol_legal=="Sim" | viol_infan=="Sim" | 
-                          viol_traf=="Sim" | viol_tort=="Sim" ~ 1, TRUE ~ 0),
-    v_neglig = case_when(viol_negli=="Sim" ~ 1, TRUE ~ 0 )) %>%
-  filter(ano_not == 2021 & def=="Sim" & grupo_viol=="Autoprovocada") %>%
-  group_by(fxet80) %>% 
-  summarise(V_Física = sum(v_fisica),
-            V_Psicol = sum(v_psico),
-            Neglig_aband = sum(v_neglig),
-            Outros = sum(v_outro),
-            V_sexual = sum(v_sexual),
-            Casos = n()) %>% adorn_totals(where = "row") %>% ungroup() %>%
-  # mutate(r_v_fis = round(V_Física/Casos*100,2), #Porcentagens
-  #        r_v_Psi = round(V_Psicol/Casos*100,2)) %>%
-  pivot_longer(cols = !c("fxet80"),names_to = "variables",values_to = "Violências") %>%
-  pivot_wider(names_from = fxet80,values_from = Violências) |> rio::export(x=_,"tipviol_X_fx80.xlsx")
-
-
-#Tipo de violência x faixa etária 80 - t_violência x fxet80 - 8.5 - Mulher
-sinan %>% filter(!is.na(fxet80) & cs_sexo == "F") %>%
-  mutate(
-    v_fisica = case_when(viol_fisic =="Sim" ~ 1, TRUE ~ 0),
-    v_psico = case_when(viol_psico=="Sim" | viol_finan=="Sim" ~ 1, TRUE ~ 0),
-    v_sexual = case_when(viol_sexu=="Sim" ~ 1, TRUE ~ 0),
-    v_outro = case_when(viol_outr=="Sim" | viol_legal=="Sim" | viol_infan=="Sim" | 
-                          viol_traf=="Sim" | viol_tort=="Sim" ~ 1, TRUE ~ 0),
-    v_neglig = case_when(viol_negli=="Sim" ~ 1, TRUE ~ 0 )) %>%
-  filter(ano_not == 2021 & def=="Sim" & grupo_viol=="Autoprovocada") %>%
-  group_by(fxet80) %>% 
-  summarise(V_Física = sum(v_fisica),
-            V_Psicol = sum(v_psico),
-            Neglig_aband = sum(v_neglig),
-            Outros = sum(v_outro),
-            V_sexual = sum(v_sexual),
-            Casos = n()) %>% adorn_totals(where = "row") %>% ungroup() %>%
-  # mutate(r_v_fis = round(V_Física/Casos*100,2), #Porcentagens
-  #        r_v_Psi = round(V_Psicol/Casos*100,2)) %>%
-  pivot_longer(cols = !c("fxet80"),names_to = "variables",values_to = "Violências") %>%
-  pivot_wider(names_from = fxet80,values_from = Violências) |> rio::export(x=_,"tipviol_X_fx80 - Mulher.xlsx")
-
-
-
-#Tipo de violência x faixa etária 80 - t_violência x fxet80 - 8.5 - Homem
-sinan %>% filter(!is.na(fxet80) & cs_sexo == "M") %>%
-  mutate(
-    v_fisica = case_when(viol_fisic =="Sim" ~ 1, TRUE ~ 0),
-    v_psico = case_when(viol_psico=="Sim" | viol_finan=="Sim" ~ 1, TRUE ~ 0),
-    v_sexual = case_when(viol_sexu=="Sim" ~ 1, TRUE ~ 0),
-    v_outro = case_when(viol_outr=="Sim" | viol_legal=="Sim" | viol_infan=="Sim" | 
-                          viol_traf=="Sim" | viol_tort=="Sim" ~ 1, TRUE ~ 0),
-    v_neglig = case_when(viol_negli=="Sim" ~ 1, TRUE ~ 0 )) %>%
-  filter(ano_not == 2021 & def=="Sim" & grupo_viol=="Autoprovocada") %>%
-  group_by(fxet80) %>% 
-  summarise(V_Física = sum(v_fisica),
-            V_Psicol = sum(v_psico),
-            Neglig_aband = sum(v_neglig),
-            Outros = sum(v_outro),
-            V_sexual = sum(v_sexual),
-            Casos = n()) %>% adorn_totals(where = "row") %>% ungroup() %>%
-  # mutate(r_v_fis = round(V_Física/Casos*100,2), #Porcentagens
-  #        r_v_Psi = round(V_Psicol/Casos*100,2)) %>%
-  pivot_longer(cols = !c("fxet80"),names_to = "variables",values_to = "Violências") %>%
-  pivot_wider(names_from = fxet80,values_from = Violências) |> rio::export(x=_,"tipviol_X_fx80 - homem.xlsx")
+# library(tidyverse)
+# library(janitor)
+# #Importando base
+# load("C:/Users/gabli/Desktop/r/Sinan/sinan_13_2023_preliminar_transtorno.RData")
+# 
+# #Cobertura municipal das pessoas com deficiência - Municípios e CNES com ao menos uma notificação
+# sinan %>% filter(!is.na(id_municip)|!is.na(id_unidade)) %>%
+#   group_by(ano_not) %>% summarise(Municípios = n_distinct(id_municip),
+#                                   CNES = n_distinct(id_unidade)) 
+# 
+# #Notificações pessoas com deficiência	
+# sinan %>% filter(def == "Sim" & grupo_viol=="Autoprovocada") %>%
+#   tabyl(ano_not,cs_sexo) %>% adorn_totals(where = c("col"))
+# 
+# #Notificações deficiência auditiva
+# sinan %>% filter(def_auditi == "Sim" & grupo_viol=="Autoprovocada") %>%
+#   tabyl(ano_not,cs_sexo) %>% adorn_totals(where = c("col"))
+# 
+# #Notificações deficiência Física
+# sinan %>% filter(def_fisica == "Sim" & grupo_viol=="Autoprovocada") %>%
+#   tabyl(ano_not,cs_sexo) %>% adorn_totals(where = c("col"))
+# 
+# 
+# #Notificações deficiência Intelectual
+# sinan %>% filter(def_mental == "Sim" & grupo_viol=="Autoprovocada") %>%
+#   tabyl(ano_not,cs_sexo) %>% adorn_totals(where = c("col"))
+# 
+# 
+# #Notificações deficiência Visual
+# sinan %>% filter(def_visual == "Sim" & grupo_viol=="Autoprovocada") %>%
+#   tabyl(ano_not,cs_sexo) %>% adorn_totals(where = c("col"))
+# 
+# #TipodefxAgr-8.1
+# #tipo de deficiência por grupo agressor - GERAL
+# sinan %>% filter(ano_not == 2021 & def=="Sim" & cs_sexo!="I" & grupo_viol=="Autoprovocada") |> 
+#   mutate(grupo_viol = fct_drop(grupo_viol), cs_sexo = fct_drop(cs_sexo)) |>
+#   tabyl(tipodef,cs_sexo, show_na = F, show_missing_levels = T) |>
+#   adorn_totals(where = c("row","col")) |> slice(match(c("Trans. Mental","Múltipla","Física","Intelectual","Auditiva","Visual","Total"), tipodef))
+# 
+# #Gráfico tipo de deficiência agressão autoprovocada.
+# sinan %>% filter(ano_not == 2021 & def=="Sim" & cs_sexo!="I" & grupo_viol=="Autoprovocada" & !is.na(tipodef)) |> 
+#   mutate(grupo_viol = fct_drop(grupo_viol) ) |>
+#   ggplot() +
+#   geom_bar(aes(x= cs_sexo, fill =  tipodef)) +
+#   #scale_y_continuous(breaks = seq(0,2500,250)) +
+#   labs(x="",y="",fill="") 
+#  
+# ###Grupo agressor por faixa etária -  Agrxfxet80-8.3
+# #Criando  Faixa etária 80+
+# sinan %>% mutate(fxet80 = as.factor(case_when(
+#   nu_idade_n<=4009 ~ "0 a 9",
+#   nu_idade_n>=4010 & nu_idade_n<=4019 ~ "10 a 19",
+#   nu_idade_n>=4020 & nu_idade_n<=4029 ~ "20 a 29",
+#   nu_idade_n>=4030 & nu_idade_n<=4039 ~ "30 a 39",
+#   nu_idade_n>=4040 & nu_idade_n<=4049 ~ "40 a 49",
+#   nu_idade_n>=4050 & nu_idade_n<=4059 ~ "50 a 59",
+#   nu_idade_n>=4060 & nu_idade_n<=4069 ~ "60 a 69",
+#   nu_idade_n>=4070 & nu_idade_n<=4079 ~ "70 a 79",
+#   nu_idade_n>=4080 & !is.na(nu_idade_n) ~    "80 ou mais"))) -> sinan
+# 
+# 
+# #Cs_sexo por faixa etária 80 - Somente autoprovocada
+# sinan %>% filter(ano_not == 2021 & def=="Sim" & cs_sexo!="I" & grupo_viol=="Autoprovocada") |> 
+#   mutate(grupo_viol = fct_drop(grupo_viol), cs_sexo = fct_drop(cs_sexo)) |>
+#   tabyl(cs_sexo,fxet80, show_na = F, show_missing_levels = T) |>
+#   adorn_totals(where = c("row","col")) |> rio::export(x=_,"cs_sexo_x_fxt80.xlsx")
+# 
+# sinan %>% filter(ano_not == 2021 & def=="Sim" & cs_sexo!="I" & grupo_viol=="Autoprovocada" & !is.na(tipodef)) |> 
+#   mutate(grupo_viol = fct_drop(grupo_viol) ) |>
+#   ggplot() +
+#   geom_bar(aes(x= fxet80, fill =  cs_sexo)) +
+#   #scale_y_continuous(breaks = seq(0,2500,250)) +
+#   labs(x="",y="",fill="") 
+# 
+# ###Tipo de deficiência por tipo de violência não individualizada - tipodef_t_violência-8.4
+# sinan %>% filter(!is.na(tipodef)) %>%
+#   mutate(
+#     v_fisica = case_when(viol_fisic =="Sim" ~ 1, TRUE ~ 0),
+#     v_psico = case_when(viol_psico=="Sim" | viol_finan=="Sim" ~ 1, TRUE ~ 0),
+#     v_sexual = case_when(viol_sexu=="Sim" ~ 1, TRUE ~ 0),
+#     v_outro = case_when(viol_outr=="Sim" | viol_legal=="Sim" | viol_infan=="Sim" | 
+#                           viol_traf=="Sim" | viol_tort=="Sim" ~ 1, TRUE ~ 0),
+#     v_neglig = case_when(viol_negli=="Sim" ~ 1, TRUE ~ 0 )) %>%
+#   filter(ano_not == 2021 & def=="Sim" & grupo_viol=="Autoprovocada") %>%
+#   group_by(tipodef) %>% 
+#   summarise(V_Física = sum(v_fisica),
+#             V_Psicol = sum(v_psico),
+#             Neglig_aband = sum(v_neglig),
+#             Outros = sum(v_outro),
+#             V_sexual = sum(v_sexual),
+#             notificações = n()) |> 
+#   arrange(desc(notificações)) |> #Ordem tabelas do atlas.
+#   adorn_totals(where = "row") |> rio::export(x=_,"tipodef_x_tipoviol.xlsx") 
+# 
+# 
+# #tipodef_t_violência-8.4 - Mulher
+# sinan %>% filter(!is.na(tipodef) & cs_sexo == "F") %>%
+#   mutate(
+#     v_fisica = case_when(viol_fisic =="Sim" ~ 1, TRUE ~ 0),
+#     v_psico = case_when(viol_psico=="Sim" | viol_finan=="Sim" ~ 1, TRUE ~ 0),
+#     v_sexual = case_when(viol_sexu=="Sim" ~ 1, TRUE ~ 0),
+#     v_outro = case_when(viol_outr=="Sim" | viol_legal=="Sim" | viol_infan=="Sim" | 
+#                           viol_traf=="Sim" | viol_tort=="Sim" ~ 1, TRUE ~ 0),
+#     v_neglig = case_when(viol_negli=="Sim" ~ 1, TRUE ~ 0 )) %>%
+#   filter(ano_not == 2021 & def=="Sim" & grupo_viol=="Autoprovocada") %>%
+#   group_by(tipodef) %>% 
+#   summarise(V_Física = sum(v_fisica),
+#             V_Psicol = sum(v_psico),
+#             Neglig_aband = sum(v_neglig),
+#             Outros = sum(v_outro),
+#             V_sexual = sum(v_sexual),
+#             notificações = n()) %>% 
+#   arrange(desc(notificações)) %>% #Ordem tabelas do atlas.
+#   adorn_totals(where = "row") |> rio::export(x=_,"tipodef_x_tipoviol - Mulher.xlsx") 
+# 
+# 
+# #tipodef_t_violência-8.4 - Homem
+# sinan %>% filter(!is.na(tipodef) & cs_sexo == "M") %>%
+#   mutate(
+#     v_fisica = case_when(viol_fisic =="Sim" ~ 1, TRUE ~ 0),
+#     v_psico = case_when(viol_psico=="Sim" | viol_finan=="Sim" ~ 1, TRUE ~ 0),
+#     v_sexual = case_when(viol_sexu=="Sim" ~ 1, TRUE ~ 0),
+#     v_outro = case_when(viol_outr=="Sim" | viol_legal=="Sim" | viol_infan=="Sim" | 
+#                           viol_traf=="Sim" | viol_tort=="Sim" ~ 1, TRUE ~ 0),
+#     v_neglig = case_when(viol_negli=="Sim" ~ 1, TRUE ~ 0 )) %>%
+#   filter(ano_not == 2021 & def=="Sim" & grupo_viol=="Autoprovocada") %>%
+#   group_by(tipodef) %>% 
+#   summarise(V_Física = sum(v_fisica),
+#             V_Psicol = sum(v_psico),
+#             Neglig_aband = sum(v_neglig),
+#             Outros = sum(v_outro),
+#             V_sexual = sum(v_sexual),
+#             notificações = n()) %>% 
+#   arrange(desc(notificações)) %>% #Ordem tabelas do atlas.
+#   adorn_totals(where = "row") |> rio::export(x=_,"tipodef_x_tipoviol - Homem.xlsx")
+# 
+# 
+# 
+# ###Tipo de violência x faixa etária 80 - t_violência x fxet80 - 8.5 - Geral
+# library(scales)
+# sinan %>% filter(!is.na(fxet80)) %>%
+#   mutate(
+#     v_fisica = case_when(viol_fisic =="Sim" ~ 1, TRUE ~ 0),
+#     v_psico = case_when(viol_psico=="Sim" | viol_finan=="Sim" ~ 1, TRUE ~ 0),
+#     v_sexual = case_when(viol_sexu=="Sim" ~ 1, TRUE ~ 0),
+#     v_outro = case_when(viol_outr=="Sim" | viol_legal=="Sim" | viol_infan=="Sim" | 
+#                           viol_traf=="Sim" | viol_tort=="Sim" ~ 1, TRUE ~ 0),
+#     v_neglig = case_when(viol_negli=="Sim" ~ 1, TRUE ~ 0 )) %>%
+#   filter(ano_not == 2021 & def=="Sim" & grupo_viol=="Autoprovocada") %>%
+#   group_by(fxet80) %>% 
+#   summarise(V_Física = sum(v_fisica),
+#             V_Psicol = sum(v_psico),
+#             Neglig_aband = sum(v_neglig),
+#             Outros = sum(v_outro),
+#             V_sexual = sum(v_sexual),
+#             Casos = n()) %>% adorn_totals(where = "row") %>% ungroup() %>%
+#   # mutate(r_v_fis = round(V_Física/Casos*100,2), #Porcentagens
+#   #        r_v_Psi = round(V_Psicol/Casos*100,2)) %>%
+#   pivot_longer(cols = !c("fxet80"),names_to = "variables",values_to = "Violências") %>%
+#   pivot_wider(names_from = fxet80,values_from = Violências) |> rio::export(x=_,"tipviol_X_fx80.xlsx")
+# 
+# 
+# #Tipo de violência x faixa etária 80 - t_violência x fxet80 - 8.5 - Mulher
+# sinan %>% filter(!is.na(fxet80) & cs_sexo == "F") %>%
+#   mutate(
+#     v_fisica = case_when(viol_fisic =="Sim" ~ 1, TRUE ~ 0),
+#     v_psico = case_when(viol_psico=="Sim" | viol_finan=="Sim" ~ 1, TRUE ~ 0),
+#     v_sexual = case_when(viol_sexu=="Sim" ~ 1, TRUE ~ 0),
+#     v_outro = case_when(viol_outr=="Sim" | viol_legal=="Sim" | viol_infan=="Sim" | 
+#                           viol_traf=="Sim" | viol_tort=="Sim" ~ 1, TRUE ~ 0),
+#     v_neglig = case_when(viol_negli=="Sim" ~ 1, TRUE ~ 0 )) %>%
+#   filter(ano_not == 2021 & def=="Sim" & grupo_viol=="Autoprovocada") %>%
+#   group_by(fxet80) %>% 
+#   summarise(V_Física = sum(v_fisica),
+#             V_Psicol = sum(v_psico),
+#             Neglig_aband = sum(v_neglig),
+#             Outros = sum(v_outro),
+#             V_sexual = sum(v_sexual),
+#             Casos = n()) %>% adorn_totals(where = "row") %>% ungroup() %>%
+#   # mutate(r_v_fis = round(V_Física/Casos*100,2), #Porcentagens
+#   #        r_v_Psi = round(V_Psicol/Casos*100,2)) %>%
+#   pivot_longer(cols = !c("fxet80"),names_to = "variables",values_to = "Violências") %>%
+#   pivot_wider(names_from = fxet80,values_from = Violências) |> rio::export(x=_,"tipviol_X_fx80 - Mulher.xlsx")
+# 
+# 
+# 
+# #Tipo de violência x faixa etária 80 - t_violência x fxet80 - 8.5 - Homem
+# sinan %>% filter(!is.na(fxet80) & cs_sexo == "M") %>%
+#   mutate(
+#     v_fisica = case_when(viol_fisic =="Sim" ~ 1, TRUE ~ 0),
+#     v_psico = case_when(viol_psico=="Sim" | viol_finan=="Sim" ~ 1, TRUE ~ 0),
+#     v_sexual = case_when(viol_sexu=="Sim" ~ 1, TRUE ~ 0),
+#     v_outro = case_when(viol_outr=="Sim" | viol_legal=="Sim" | viol_infan=="Sim" | 
+#                           viol_traf=="Sim" | viol_tort=="Sim" ~ 1, TRUE ~ 0),
+#     v_neglig = case_when(viol_negli=="Sim" ~ 1, TRUE ~ 0 )) %>%
+#   filter(ano_not == 2021 & def=="Sim" & grupo_viol=="Autoprovocada") %>%
+#   group_by(fxet80) %>% 
+#   summarise(V_Física = sum(v_fisica),
+#             V_Psicol = sum(v_psico),
+#             Neglig_aband = sum(v_neglig),
+#             Outros = sum(v_outro),
+#             V_sexual = sum(v_sexual),
+#             Casos = n()) %>% adorn_totals(where = "row") %>% ungroup() %>%
+#   # mutate(r_v_fis = round(V_Física/Casos*100,2), #Porcentagens
+#   #        r_v_Psi = round(V_Psicol/Casos*100,2)) %>%
+#   pivot_longer(cols = !c("fxet80"),names_to = "variables",values_to = "Violências") %>%
+#   pivot_wider(names_from = fxet80,values_from = Violências) |> rio::export(x=_,"tipviol_X_fx80 - homem.xlsx")
 
 
 
 # Tabelas violência contra crianças e jovens ---------------------------------------
 library(tidyverse)
 library(janitor)
-load("C:/Users/gabli/Desktop/r/Sinan/sinan_13_2023_preliminar_transtorno.RData")
-year <- 2013:2023
-
+here::i_am("Rotinas/SINAN_transtorno_atlas_2026.R")
+#Carrgando base SINAN Violência
+load(paste0(dirname(getwd()),"/bases/sinan_violencia/sinan_14_24_transtorno.Rdata") )
+year <- 2014:2024;gc()
 
 sinan %>% filter(!is.na(idade) & grupo_viol!="Autoprovocada" & ano_not %in% year) |> 
   mutate(fxet_eca = as.factor(case_when(
@@ -1839,55 +1844,77 @@ sinan %>% filter(!is.na(idade) & grupo_viol!="Autoprovocada" & ano_not %in% year
     nu_idade_n>4014 & nu_idade_n<=4019 ~ "15 a 19",
     TRUE ~ NA_character_) ) ) |>
   tabyl(fxet_eca, show_na = F) |> adorn_totals(where = c("row") ) |>
-  adorn_percentages("col") %>% adorn_pct_formatting(digits = 1) 
-
-
-
-
-
-
+  adorn_pct_formatting(digits = 1) |>
+  rio::export(x=_, "base/eca/base/eca_fxet.xlsx") 
 
 
 #Tabela 4.5 Brasil: Distribuição da violência contra crianças e adolescentes por local da violência e faixa etária da vítima (2011-2021)*
 #Criando  Faixa crianças e jovens
 sinan %>% filter(!is.na(idade) & grupo_viol!="Autoprovocada" & ano_not %in% year) |> 
   mutate(fxet_eca = as.factor(case_when(
-  nu_idade_n<=4004 ~ "0 a 4",
-  nu_idade_n>4004 & nu_idade_n<=4014 ~ "5 a 14",
-  nu_idade_n>4014 & nu_idade_n<=4019 ~ "15 a 19",
+  nu_idade_n<=4004 ~ "0 a 4 anos",
+  nu_idade_n>4004 & nu_idade_n<=4014 ~ "5 a 14 anos",
+  nu_idade_n>4014 & nu_idade_n<=4019 ~ "15 a 19 anos",
   TRUE ~ NA_character_)),
-  #Ordem de local da violência na tabela.
-  local_ocor = local_ocor |> fct_relevel(c("Residência","Via pública",
-                                           "Ignorado", "Outro",
-                                           "Bar ou similar", "Escola",
-                                           "Comércio/Serviços", "Habitação coletiva",
-                                           "Local de prática esportiva","Indústrias/Construção") ) ) |>  
-  tabyl(local_ocor,fxet_eca,show_na = F) |> adorn_totals(where = c("row")) |>
-  adorn_percentages("col") %>% adorn_pct_formatting(digits = 1) |>
-  #Ordem das colunas na tabela.
-  select("Local da Violência" = local_ocor,"0 a 4","5 a 14","15 a 19") |>
-  rio::export(x=_,"eca_local_fxet.xlsx")
+  #Ordem da faixa etária
+  fxet_eca = fxet_eca |> fct_relevel( c("0 a 4 anos","5 a 14 anos","15 a 19 anos") ),
+  
+  local_ocor = local_ocor |> as.character() ) |>
+  #Tabela
+  tabyl(local_ocor,fxet_eca,show_na = F) |> #adorn_totals(where = c("row")) |>
+  adorn_percentages("col") %>% adorn_pct_formatting(digits = 1) |> 
+  #Nota de rodapé
+  add_row(
+  local_ocor = glue::glue("Fonte: Sinan/MS. Elaboração: Diest/Ipea e FBSP. 
+  *Microdados do SINAN referentes a {max(year)} são preliminares e foram coletados em março de {max(year+2)}.") ) |> 
+  #Título da tabela
+   adorn_title(placement = "top", row_name = "Local da Violência",
+            col_name = glue::glue("Distribuição do local da violência e faixa etária da vítima ({min(year)}–{max(year)})") ) |>
+  rio::export(x=_,"base/eca/base/eca_local_fxet.xlsx")
   
 
 #Tabela 4.12 Brasil: Distribuição da violência contra crianças e adolescentes por autor da violência 
 #Grupo autor da violência
 sinan %>% filter(!is.na(idade) & grupo_viol!="Autoprovocada" & ano_not %in% year ) |> 
-  mutate(fxet_eca = as.factor(case_when(
-    idade<=4 ~ "0 a 4",
-    idade>=5 & idade<=14 ~ "5 a 14",
-    idade>=15 & idade<=19 ~ "15 a 19",
+  
+  mutate(
+    
+    fxet_eca = as.factor(case_when(
+    idade<=4 ~ "0 a 4 anos",
+    idade>=5 & idade<=14 ~ "5 a 14 anos",
+    idade>=15 & idade<=19 ~ "15 a 19 anos",
     TRUE ~ "Outras")),
+    
+    grupo_viol = grupo_viol |> fct_drop(),
+    
     grupo_viol = grupo_viol |> fct_relevel("Doméstica", "Comunitária",
                                            "Institucional","Misto") ) |> 
+  
   tabyl(grupo_viol,fxet_eca,show_na = T, show_missing_levels = T) |>
   adorn_totals(c("row", "col")) %>%
   adorn_percentages("col") %>% adorn_pct_formatting(digits = 1) %>%
   adorn_ns(position = "front") |> 
   #Colocando vírgula no lugar de ponto.
-  mutate(across(where(is.character), ~ str_replace_all(as.character(.x), "\\,", "."))) |>
+  mutate(across(where(is.character), ~ str_replace_all(as.character(.x), "\\,", ".") ),
+         grupo_viol = grupo_viol |> as.character())  |>
   #Ordem das colunas na tabela.
-  select("Autoria" = grupo_viol,"0 a 4","5 a 14","15 a 19") |> 
-  rio::export(x=_,"eca_grupo_viol_fxet.xlsx")
+  select("Autoria" = grupo_viol,"0 a 4 anos","5 a 14 anos","15 a 19 anos")  |>
+  
+  #Nota de rodapé
+  add_row(
+    Autoria = glue::glue("Fonte: Sinan/MS. Elaboração: Diest/Ipea e FBSP. 
+  *Microdados do SINAN referentes a {max(year)} são preliminares e foram coletados em março de {max(year+2)}.") ) |> 
+  #Necessário para o título da tabela
+  as_tibble() |>
+
+  #Título da tabela
+  adorn_title(placement = "top", row_name = "Autoria",
+              col_name = glue::glue("Violência contra crianças e adolescentes, por autoria provável ({min(year)}–{max(year)})") ) |> 
+  rio::export(x=_,"base/eca/base/eca_grupo_viol_fxet.xlsx")
+  
+
+
+
 
 #Número de violência física contra crianças e adolescentes – Brasil
 sinan |>
