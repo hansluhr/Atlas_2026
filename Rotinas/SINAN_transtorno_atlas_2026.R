@@ -2217,25 +2217,21 @@ rm(sinan,sinan_idoso,year)
 # Tabelas lesão autoprovocadas idosos(60+)  ----------------------------------------------------------------
 library(tidyverse)
 library(janitor)
-#Importando população de idosos 
-data_list <- rio::import_list("D:/Dropbox/Ipea/Atlas/Pop-PNADc-60+.xlsx", 
-                              which = seq(from = 2, to = 12, by = 1), 
-                              #Indicar as sheets desejadas. 
-                              setclass = "tbl")
-# Loop para extrair dataframe da list data_list e criar dataframe com o nome do  dataframe na data_list
-for(i in seq_along(data_list)) {
-  assign(names(data_list)[i], data_list[[i]])
-}
-rm(data_list,i)
 
-#Aplicar bind_rows a todos os dataframes no ambiente global e juntar as pnadcs em tabela única
-pop_pnadc_idoso <- do.call(bind_rows, 
-                           mget(ls(pattern = "^[^.]+$"))) |> 
+here::i_am("Rotinas/SINAN_transtorno_atlas_2026.R")
+#Importando população de idosos.
+#Caminho do excel com pnadc
+excel_pnadc <- paste0(dirname(getwd()),"/bases/populacao/Pop-PNADc-60+.xlsx") 
+#Importação e empilhando os últimos dez anos da PNADc
+pop_pnadc_idoso <- map_dfr(
+  #Tail informa que desejamos os últimos dez anos da pnadc
+  .x = tail(readxl::excel_sheets(excel_pnadc), 11),
+  
+  ~ readxl::read_excel(path = excel_pnadc, sheet = .x) ) |>
+  
   #Selecionando população geral de idosos
   select(uf=UF,ano,pop=Pop)
 
-#Removendo pnadcs, exceto pop_pnadc_idoso
-rm(list = setdiff(ls(), "pop_pnadc_idoso"))
 
 #Tratando População PNADc
 pop_pnadc_idoso |> 
@@ -2250,19 +2246,22 @@ pop_pnadc_idoso |>
   mutate(uf = "Brasil" |> as_factor()) |>
   bind_rows(pop_pnadc_idoso) -> pop_pnadc_idoso
 
+#Removendo pnadcs, exceto pop_pnadc_idoso
+rm(list = setdiff(ls(), "pop_pnadc_idoso"))
 
-#Importando base SINAN
-load("C:/Users/gabli/Desktop/r/Sinan/sinan_13_2023_preliminar_transtorno.RData")
-year <- c(2013:2023)
+
+#Carrgando base SINAN Violência
+load(paste0(dirname(getwd()),"/bases/sinan_violencia/sinan_14_24_transtorno.Rdata") )
+year <- 2014:2024;gc()
 
 #Número de notificações de lesão autoprovocada. Usando metodologia do PCD
 sinan %>% filter(ano_not %in% year & idade>=60 & grupo_viol=="Autoprovocada") |> 
   #Ano de notificação na uf de residência
   count(sg_uf, ano_not, name = "notfs") |> 
   #Excluindo UFs de residência não informadadas e rename das variáveis
-  filter(!is.na(sg_uf)) |>  rename(uf=sg_uf,ano=ano_not) |> tibble() -> sinan_not_ufs
+  filter(!is.na(sg_uf)) |> rename(uf=sg_uf,ano=ano_not) |> as_tibble() -> sinan_not_ufs
 
-#### ATENÇÃO ###
+                                  #### ATENÇÃO ###
 #Algmas notificações não indicam a UF de residência, 
 #portanto realizar o agregado nacional através do somatório das UFs de residência informa valor inferior a total de notificações nacionais.  
 #É necessário contabilizar o agregado nacional e inserir na base com ufs de residência
@@ -2286,38 +2285,73 @@ rm(pop_pnadc_idoso)
 sinan_idoso |> select(ano,uf,notfs) |>
   pivot_wider(names_from = ano, values_from = notfs) %>%
   #Variações 
-  mutate(x = format(round(pull(((.[, ncol(.)] /.[, 2])-1)*100),digits = 1), nsmall = 1), #Variação de 10 anos.
-         z = format(round(pull(((.[, ncol(.)] /.[, 11])-1)*100),digits = 1), nsmall = 1), #Variação anual
-         y = format(round(pull(((.[, ncol(.)] /.[, 7])-1)*100),digits = 1), nsmall = 1)) %>% #Variação de 5 anos
-  #rename_with(.,.fn = paste(colnames(.)[2],"a",colnames(.)[12], sep = " "), .cols = starts_with("x"))
+  mutate(
+    #Anual
+    "{names(.)[ncol(.)-1]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[ncol(.)-1]]) / .[[ncol(.)-1]] * 100, 1), decimal.mark = ","), 
+    
+    #Cinco anos
+    "{names(.)[7]} a {names(.)[ncol(.)]} " := 
+      format(round((.[[ncol(.)]] - .[[7]]) / .[[7]] * 100, 1), decimal.mark = ","),
+    
+    #Dez anos 
+    "{names(.)[2]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[2]]) / .[[2]] * 100, 1), decimal.mark = ",") )  |>
+  
   #Ordenando a linha de população seguindo a ordem do atlas.
   slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
                 "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
                 "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
                 "Sergipe","Tocantins"),uf)) |>
   #Colocando vírgula no lugar de ponto.
-  mutate(across(.cols = where(is.character), ~ str_replace_all(as.character(.x), "\\.", ","))) |>
-  adorn_title(placement = "top",col_name = "Número de notificações autoprovocadas de idosos (60+), por UF - Brasil") %>% 
-  rio::export(.,"n_autoprovocadas_idoso.xlsx")
+  mutate(across(.cols = where(is.character), ~ str_replace_all(as.character(.x), "\\.", ",")),
+         uf = uf |> as.character() ) |>
+  #Nota de rodapé
+  add_row(
+    uf = glue::glue("Fonte: MS/SVSA - Sistema de Informação de Agravos de Notificação (Sinan). Elaboração: Diest/Ipea e FBSP. Notas: 1- Em alguns anos a UF de residência da vítima não
+   é informada. Assim, nestes anos o somatório de notificações nas UFs é inferior ao somatório nacional. 2 - Identificação das notificações segue metodologia apresentada na seção de PCD.
+   3 - Microdados do Sinan referentes a {max(year)} são preliminares e foram coletados em março de {max(year+2)}") ) |>
+     #Título da Tabela
+  adorn_title(placement = "top", row_name = "",
+              col_name = glue::glue("Número de agravos de notificação de lesão autoprovocada de idosos, por UF {min(year)}–{max(year)}") ) |> 
+   rio::export(x = _,"base/idoso/base/n_autoprovocadas_idoso.xlsx")
 
 
 #Tabela taxa de notificação violência autoprovocada de idosos (60+), por UF de residência - Brasil
 sinan_idoso |> select(ano,uf,tx_nots) |>
   pivot_wider(names_from = ano, values_from = tx_nots) %>%
   #Variações 
-  mutate(x = format(round(pull(((.[, ncol(.)] /.[, 2])-1)*100),digits = 1), nsmall = 1), #Variação de 10 anos.
-         z = format(round(pull(((.[, ncol(.)] /.[, 11])-1)*100),digits = 1), nsmall = 1), #Variação anual
-         y = format(round(pull(((.[, ncol(.)] /.[, 7])-1)*100),digits = 1), nsmall = 1)) %>% #Variação de 5 anos
-  #rename_with(.,.fn = paste(colnames(.)[2],"a",colnames(.)[12], sep = " "), .cols = starts_with("x"))
+  mutate(
+    
+    #Anual
+    "{names(.)[ncol(.)-1]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[ncol(.)-1]]) / .[[ncol(.)-1]] * 100, 1), decimal.mark = ","), 
+    
+    #Cinco anos
+    "{names(.)[7]} a {names(.)[ncol(.)]} " := 
+      format(round((.[[ncol(.)]] - .[[7]]) / .[[7]] * 100, 1), decimal.mark = ","),
+    
+    #Dez anos 
+    "{names(.)[2]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[2]]) / .[[2]] * 100, 1), decimal.mark = ",") )  |>
+
   #Ordenando a linha de população seguindo a ordem do atlas.
   slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
                 "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
                 "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
                 "Sergipe","Tocantins"),uf)) |>
   #Colocando vírgula no lugar de ponto.
-  mutate(across(.cols = where(is.character)|where(is.numeric), ~ str_replace_all(as.character(.x), "\\.", ","))) |>
-  adorn_title(placement = "top",col_name = "Taxa de notificação autoprovocada idosos (60+), por UF - Brasil") %>% 
-  rio::export(.,"taxa_autoprovocadas_idoso.xlsx")
+  mutate(across(.cols = where(is.character)|where(is.numeric), ~ str_replace_all(as.character(.x), "\\.", ",")),
+         uf = uf |> as.character() ) |>
+  #Nota de rodapé
+  add_row(
+    uf = glue::glue("Fonte: IBGE - Pesquisa Nacional por Amostra de Domicílios Contínua (PNADc) e MS/SVSA - Sistema de Informação de Agravos de Notificação (Sinan). Elaboração: Diest/Ipea e FBSP. Notas: 1- Em alguns anos a UF de residência da vítima não
+   é informada. Assim, nestes anos o somatório de notificações nas UFs é inferior ao somatório nacional. 2 - Identificação das notificações segue metodologia apresentada na seção de PCD.
+   3 - Microdados do Sinan referentes a {max(year)} são preliminares e foram coletados em março de {max(year+2)}") ) |>
+  #Título da Tabela
+  adorn_title(placement = "top", row_name = "",
+              col_name = glue::glue("Taxa de agravos de notificação de lesão autoprovocada de idosos, por UF {min(year)}–{max(year)}") ) |> 
+  rio::export(x = _,"base/idoso/base/taxa_autoprovocadas_idoso.xlsx")
 
 rm(sinan,sinan_idoso,year)
 
