@@ -533,12 +533,14 @@ data |>
   
   #Mantém somente intenções de interesse
   filter(intencao %in% c("Homicídio","h_legal") ) -> base
-beepr::beep()
+
 DBI::dbDisconnect(con) ; gc()
-#rm(list = setdiff(ls(),c("base","year")); gc()
+rm(list = setdiff( ls(),c("base","year") ) ); gc()
+beepr::beep()
 
 methods_restore()
 library(tidyverse)
+
 
 #Contagem de internações
 base |>
