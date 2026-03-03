@@ -639,11 +639,11 @@ rm(list = ls() );gc()
 library(tidyverse)
 library(janitor)
 #Pasta raiz
-here::i_am("Rotinas/Idoso_atlas_2026_sinan_sih_sim.R") 
+here::i_am("Rotinas/Idoso/Idoso_atlas_2026_sinan_sih_sim.R") 
 #Importação base de interesse
 load(paste0(dirname(getwd()),"/bases/sim/RData/sim_doext_14_24.Rdata"))
 #Anos de interesse. Últimos dez anos.
-year <- seq(as.integer(format(Sys.Date(), "%Y")) - 10, as.integer(format(Sys.Date(), "%Y")) - 2)
+year <- seq(as.integer(format(Sys.Date(), "%Y")) - 12, as.integer(format(Sys.Date(), "%Y")) - 2)
 
 #Homicídio idoso raça\cor
 sim_doext |> 
@@ -751,12 +751,21 @@ base |>
   arrange(def_racacor) |> 
   pivot_longer(cols = starts_with("tx"), names_to = "taxas") |>
   pivot_wider(names_from = ano, values_from = "value") |>
-  arrange(taxas) 
-
-
-
-
-
+  arrange(taxas) |>
+  
+  mutate(across(where(is.numeric), ~ str_replace_all(as.character(.), "\\.", ","))) |>
+  
+  #Nota de rodapé
+  add_row(
+    def_racacor = "Fonte: IBGE - Pesquisa Nacional por Amostra de Domicílios Contínua (PNADc) e MS/SVSA/CGIAE - Sistema de Informações sobre Mortalidade - SIM. Elaboração: Diest/Ipea e FBSP.
+Nota: O número de homicídios na UF de residência foi obtido pela soma das seguintes CIDs 10: X85-Y09 e Y35 - Y36, ou seja, óbitos causados por agressão, intervenção legal
+e operações de guerra. Quedas correspondem às CID10: W00-W19. Acidente de Transporte engloba às CID10: V01-V99. A população de negros foi obtida pela soma de pretos e
+pardos. O número de não negros foi obtido pela soma de brancos, amarelos e indígenas. ") |>
+  
+  #Título da Tabela
+  adorn_title(placement = "top", row_name = "",
+              col_name = glue::glue("Taxas de óbitos por causas externas segundo as principais categorias (homicídio, queda e acidente de transporte); faixa etária
+             de 60 anos ou mais; por sexo e cor/raça {min(year)}–{max(year)}") ) |> 
   rio::export(x = _, "base/idoso/base/tx_homic_queda_acide_idoso.xlsx")
 
 
