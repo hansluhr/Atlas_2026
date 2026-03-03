@@ -754,7 +754,6 @@ base |>
   arrange(taxas) |>
   
   mutate(across(where(is.numeric), ~ str_replace_all(as.character(.), "\\.", ","))) |>
-  
   #Nota de rodapé
   add_row(
     def_racacor = "Fonte: IBGE - Pesquisa Nacional por Amostra de Domicílios Contínua (PNADc) e MS/SVSA/CGIAE - Sistema de Informações sobre Mortalidade - SIM. Elaboração: Diest/Ipea e FBSP.
