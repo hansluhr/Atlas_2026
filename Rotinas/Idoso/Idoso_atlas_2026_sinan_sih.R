@@ -281,3 +281,11 @@ sinan_idoso |> select(ano,uf,tx_nots) |>
   rio::export(x = _,"base/idoso/base/taxa_autoprovocadas_idoso.xlsx")
 
 rm(sinan,sinan_idoso,year)
+
+
+
+
+
+# Internações -------------------------------------------------------------
+
+
