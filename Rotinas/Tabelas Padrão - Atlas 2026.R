@@ -297,15 +297,20 @@ rm(base)
 # Anos Potenciais de vida Perdidos ----------------------------------------
 library(tidyverse)
 library(janitor)
+#Pasta raiz
+here::i_am("Rotinas/Tabelas Padrão - Atlas 2026.R") 
+#Importação base de interesse
+load(paste0(dirname(getwd()),"/bases/sim/RData/sim_doext_14_24.Rdata"))
+#últimos dez anos
+year <- seq(as.integer(format(Sys.Date(), "%Y")) - 12, as.integer(format(Sys.Date(), "%Y")) - 2)
 
-#Importando a base
-load("C:/Users/gabli/Desktop/r/homic_preds.RData")
-year <- c(2012:2022)
 
 #Método Romeder e McWhinnie.
-sim_doext |> #slice_sample(n=1000) |>
-  mutate(intencao = recode(intencao,"h_legal" = "Homicídio")) |>
-  filter(ano %in% year & idade %in% c(1:69) & !intencao %in% c("Indeterminado") ) |> droplevels() |>
+sim_doext |> slice_sample(n=1000) |>
+  #SIM duckdb
+  mutate(idade = idade |> as.integer() ) |>
+  
+  filter(ano %in% year & idade %in% c(1:69) & !intencao %in% c("Indeterminado") ) |> 
   #Quero o número de homicídios por idade
   group_by(intencao) |>
   count(idade, name = "n") |> 
@@ -323,8 +328,7 @@ sim_doext |> #slice_sample(n=1000) |>
     intencao == "Homicídio" ~ scale_y_continuous(labels = scales::label_number(scale = 1 / 1e3),
                                                  breaks = seq(0, 1250000, 250000) ), 
     intencao == "Acidente" ~ scale_y_continuous(labels = scales::label_number(scale = 1 / 1e3),
-                                                breaks = seq(0,600000,100000) )
-  )  )  +
+                                                breaks = seq(0,600000,100000) ) )  )  +
   theme(strip.text = element_text(size=10, face="bold"),
         axis.title.y = element_text(size = 10) ) + labs(fill = "", x = "", y = "APVP (Mil anos)")
 ggsave(filename = "APVP.bmp", width = 13,height = 8,dpi=200)
@@ -360,10 +364,11 @@ ggsave(filename = "APVP.bmp", width = 13,height = 8,dpi=200)
 
 #Anos potenciais de vida perdidos - - Polígonos vazados nas outras idades e por instrumento
 sim_doext |> #slice_sample(n=1000) |>
-  mutate(intencao = recode(intencao,"h_legal" = "Homicídio")) |>
-  filter(ano %in% year & idade %in% c(0:69) & intencao == "Homicídio" ) |> droplevels() |>
+  #Sim duckdb 
+  mutate(idade = idade |> as.integer() ) |>
+  filter(ano %in% year & idade %in% c(0:69) & intencao_homic == "Homicídio" ) |> droplevels() |>
   #Quero o número de homicídios por idade
-  group_by(intencao,instrumento) |>
+  group_by(intencao_homic,instrumento) |>
   count(idade, name = "n") |> 
   #Anos Potenciais de Vida Perdidos (APVP)
   mutate(anos_restantes = 70 - (idade + 0.5),
@@ -384,26 +389,32 @@ sim_doext |> #slice_sample(n=1000) |>
         legend.text = element_text(size = 11.5, face="bold"),
         legend.background = element_rect(fill = "transparent", colour = NA)) + 
   labs(fill = "Instrumento da causa básica do óbito", x = "", y = "APVP (Mil anos)")
-ggsave(filename = "APVP.bmp", width = 13,height = 10,dpi=250)
-ggsave(filename ="APVP.eps",width = 15,height = 10,device=cairo_ps, dpi=350)
+
+ggsave(filename = "base/eca/figura/APVP.bmp", width = 13,height = 10,dpi=250)
+ggsave(filename ="base/eca/figura/APVP.eps",width = 15,height = 10,device=cairo_ps, dpi=350)
 
 
 
 #Tabelas - APVP por idade
 sim_doext |> 
+  
+  mutate(idade = idade |> as.integer() ) |>
+  
   filter(ano %in% year & idade %in% c(15:29) & intencao_homic == "Homicídio") |> droplevels() |>
   #Quero o número de homicídios por idade
   count(idade, name = "n") |> 
   #Anos Potenciais de Vida Perdidos (APVP) - Por idade
   mutate(anos_restantes = 70 - (idade + 0.5),
-         apvp = anos_restantes * n) |> view()
-summarise(apvp = sum(apvp) )
-
+         apvp = anos_restantes * n) |> 
+  #Exportando tabela.
+  rio::export(x= _ ,"base/eca/base/apvp_eca.xlsx")
 
 
 #Tabelas - APVP intencao
 sim_doext |> 
-  mutate(intencao = recode(intencao,"h_legal" = "Homicídio")) |>
+  #sim duckdb
+  mutate(idade = idade |> as.integer() ) |>
+  
   filter(ano %in% year & idade %in% c(0:69)) |> droplevels() |>
   #Quero o número de homicídios por idade
   group_by(intencao) |>
@@ -412,10 +423,18 @@ sim_doext |>
   mutate(anos_restantes = 70 - (idade + 0.5),
          apvp = anos_restantes * n) |> 
   #Valor total de APVP de jovens
-  filter(idade %in% c(15:29) ) |> summarise(apvp = sum(apvp) )
+  filter(idade %in% c(15:29) ) |>
+  #Exportando tabela.
+  rio::export(x= _ ,"base/eca/base/apvp_eca_intencao.xlsx")
+
+
 
 #Tabelas - APVP instrumento
 sim_doext |> 
+  
+  #Sim duckdb
+  mutate(idade = idade |> as.integer() ) |>
+  
   filter(ano %in% year & idade %in% c(0:69) & intencao_homic == "Homicídio") |> droplevels() |>
   #Quero o número de homicídios por idade
   group_by(intencao_homic,instrumento) |>
@@ -426,7 +445,9 @@ sim_doext |>
   #Valor total de APVP de jovens
   filter(idade %in% c(15:29) ) |> summarise(apvp = sum(apvp) ) |>
   mutate(total = sum(apvp),
-         prop = (apvp/total)*100)
+         prop = (apvp/total)*100) |>
+  #Exportando tabela.
+  rio::export(x= _ ,"base/eca/base/apvp_eca_homic_instrumento.xlsx")
 
 
 
