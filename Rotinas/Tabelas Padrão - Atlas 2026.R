@@ -409,10 +409,6 @@ base |> select(ano,def_uf_resd, tx_suic) |>
 rm(base)
 
 
-
-
-
-
 # Homicídio de Homens Jovens ----------------------------------------------
 library(tidyverse)
 library(janitor)
