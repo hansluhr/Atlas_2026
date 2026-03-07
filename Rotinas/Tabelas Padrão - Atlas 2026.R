@@ -293,6 +293,126 @@ base |> select(ano,def_uf_resd, tx_homic) |>
 rm(base)
 
 
+
+
+# Suicídios de Jovens -----------------------------------------------------
+library(tidyverse)
+library(janitor)
+#Pasta raiz
+here::i_am("Rotinas/Tabelas Padrão - Atlas 2026.R") 
+#Importação base de interesse
+load(paste0(dirname(getwd()),"/bases/sim/RData/sim_doext_14_24.Rdata"))
+#últimos dez anos
+year <- seq(as.integer(format(Sys.Date(), "%Y")) - 12, as.integer(format(Sys.Date(), "%Y")) - 2)
+
+#Contagem de homicídios registrados, por ano e UF
+sim_doext |> 
+  #Filtro das intenções de interesse.
+  filter(intencao_homic == "Suicídio" & idade %in% c(10:19) ) |>
+  
+  count(ano, cod_uf_resd, def_uf_resd, name = "suicidio") %>%
+  
+  bind_rows(. |>
+          summarise(
+            cod_uf_resd = "1",
+            def_uf_resd="Brasil",
+                      suicidio = sum(suicidio), .by=ano) ) -> suic
+  
+#Join com a base populacional.
+left_join(x = 
+readxl::read_excel("base/pop_10a19.xlsx", 
+                        sheet = "Plan1") |>
+  pivot_longer(cols = !c(cod_uf_resd,def_uf_resd), names_to = "ano", values_to = "pop")  |>
+  
+  mutate(cod_uf_resd = cod_uf_resd |> as.character() ) ,y = suic, by = join_by(cod_uf_resd, def_uf_resd, ano) ) |>
+  
+  #Taxa padrão atlas.
+  mutate(tx_suic = format(round((suicidio/pop)*100,digits = 1) ) |> as.double() ) -> base
+
+
+rm(suic)
+
+
+#Tabela formato wide do número de suicídios de jovens.
+base |> select(ano,def_uf_resd, suicidio) |>
+  pivot_wider(names_from = ano, values_from =  suicidio) %>%
+  #Variações
+  mutate(
+    #Anual
+    "{names(.)[ncol(.)-1]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[ncol(.)-1]]) / .[[ncol(.)-1]] * 100, 1), decimal.mark = ","),
+    #Cinco anos
+    "{names(.)[7]} a {names(.)[ncol(.)]} " := 
+      format(round((.[[ncol(.)]] - .[[7]]) / .[[7]] * 100, 1), decimal.mark = ","),
+    #Dez anos
+    "{names(.)[2]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[2]]) / .[[2]] * 100, 1), decimal.mark = ",") ) |>
+  
+  #Ordenando a linha da tabela seguindo o padrão Atlas.
+  slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
+                "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
+                "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
+                "Sergipe","Tocantins"),def_uf_resd) ) |>
+  # Converte as colunas numéricas para caracteres e substitui pontos por vírgulas.
+  #Assim fica mais fácil converter para numérico no excel.
+  mutate(across(where(is.numeric), ~ str_replace_all(as.character(.), "\\.", ","))) %>%
+  #Necessário para colocar o título
+  as_tibble() |>
+  #Nota de rodapé
+  add_row(
+    def_uf_resd = "Fonte: MS/SVSA/CGIAE - Sistema de Informações sobre Mortalidade - SIM. Elaboração: Diest/Ipea e FBSP. Nota: O número de suicídios na UF de residência foi obtido pela soma das seguintes CIDs 10: X60-X84, ou seja, lesões autoprovocadas voluntariamente. O número de óbitos foi obtido pela soma de indivíduos de 10 a 19 anos de idade.") |>
+  #Título da Tabela
+  adorn_title(placement = "top", row_name = "",
+              col_name = glue::glue("Suicídios de Jovens (15 a 29 anos), por UF {min(year)}–{max(year)}") ) |>
+  #Exportando tabela.
+  rio::export(x= _ ,"base/eca/base/n_suicdio_jovem_uf_br.xlsx")
+
+
+### Tabela com taxa de homicídios Jovens
+
+
+#Tabela formato wide do número de homicídios de jovens.
+base |> select(ano,def_uf_resd, tx_suic) |>
+  pivot_wider(names_from = ano, values_from =  tx_suic) %>%
+  
+  #Variações
+  mutate(
+    #Anual
+    "{names(.)[ncol(.)-1]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[ncol(.)-1]]) / .[[ncol(.)-1]] * 100, 1), decimal.mark = ","), 
+    
+    #Cinco anos
+    "{names(.)[7]} a {names(.)[ncol(.)]} " := 
+      format(round((.[[ncol(.)]] - .[[7]]) / .[[7]] * 100, 1), decimal.mark = ","),
+    
+    #Dez anos 
+    "{names(.)[2]} a {names(.)[ncol(.)]}" := 
+      format(round((.[[ncol(.)]] - .[[2]]) / .[[2]] * 100, 1), decimal.mark = ",") )  |>
+  
+  #Ordenando a linha da tabela seguindo o padrão Atlas.
+  slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
+                "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
+                "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
+                "Sergipe","Tocantins"),def_uf_resd) ) |>
+  # Converte as colunas numéricas para caracteres e substitui pontos por vírgulas.
+  #Assim fica mais fácil converter para numérico no excel.
+  mutate(across(where(is.numeric), ~ str_replace_all(as.character(.), "\\.", ","))) %>%
+  
+  #Nota de rodapé
+  add_row(
+    def_uf_resd = "Fonte: IBGE - Pesquisa Nacional por Amostra de Domicílios Contínua (PNADc) e MS/SVSA/CGIAE - Sistema de Informações sobre Mortalidade - SIM. Elaboração: Diest/Ipea e FBSP. Nota: O número de suicídios na UF de residência foi obtido pela soma das seguintes CIDs 10: X60-X84, ou seja, lesões autoprovocadas voluntariamente. O número de óbitos e da população foi obtido pela soma de indivíduos de 10 a 19 anos de idade.") |>
+  #Título da Tabela
+  adorn_title(placement = "top", row_name = "",
+              col_name = glue::glue("Taxa de Suicídios de Jovens (15 a 29 anos), por UF {min(year)}–{max(year)}") ) |>
+  #Exportando tabela.
+  rio::export(x= _ ,"base/eca/base/tx_suicd_jovem_uf_br.xlsx")
+rm(base)
+
+
+
+
+
+
 # Homicídio de Homens Jovens ----------------------------------------------
 library(tidyverse)
 library(janitor)
