@@ -7,12 +7,13 @@ library(janitor)
 here::i_am("Rotinas/Tabelas Padrão - Atlas 2026.R") 
 #Importação base de interesse
 load(paste0(dirname(getwd()),"/bases/sim/RData/sim_doext_14_24.Rdata"))
-year <- c(2014:2024)
+#últimos dez anos
+year <- seq(as.integer(format(Sys.Date(), "%Y")) - 12, as.integer(format(Sys.Date(), "%Y")) - 2)
 
 
 #Número de Homicídios - Geral
 sim_doext |>
-  filter(intencao_homic == "Homicídio") |>
+  filter(intencao_homic == "Homicídio" & ano %in% year) |>
   tabyl(def_uf_resd,ano) |> adorn_totals(name = "Brasil") %>%
 
 #Variações
@@ -34,14 +35,19 @@ mutate(
   slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
                 "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
                 "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
-                "Sergipe","Tocantins"), def_uf_resd) ) |> 
+                "Sergipe","Tocantins"), def_uf_resd) )  |>
   #Necessário para colocar o título
   as_tibble() |>
-  janitor::adorn_title(row_name = "UF",
-                       placement = "top", 
-                       col_name = glue::glue("Número de homicídios, por UF {min(year)}–{max(year)}") )  |>
+  #Nota de rodapé
+  add_row(
+  def_uf_resd = "MS/SVSA/CGIAE - Sistema de Informações sobre Mortalidade (SIM). Elaboração: Diest/Ipea e FBSP. Nota: O número de homicídios foi obtido pela soma das seguintes CIDs 10: X85-Y09 e Y35 - Y36, ou seja, óbitos causados por agressão, intervenção legal e operações de guerra.") |>
+
+  #Título da Tabela
+  adorn_title(placement = "top", row_name = "",
+              col_name = glue::glue("Número de homicídios, por UF {min(year)}–{max(year)}") ) |> 
+ 
   #Exportando tabela.
-  rio::export(x = _,"base/n_homicidio_uf_br.xlsx")
+  rio::export(x = _,"base/homic/base/n_homicidio_uf_br.xlsx")
 
 
 # #Taxa de homicídios - Geral ---------------------------------------------
@@ -51,7 +57,8 @@ library(janitor)
 here::i_am("Rotinas/Tabelas Padrão - Atlas 2026.R") 
 #Importação base de interesse
 load(paste0(dirname(getwd()),"/bases/sim/RData/sim_doext_14_24.Rdata"))
-year <- c(2014:2024)
+#últimos dez anos
+year <- seq(as.integer(format(Sys.Date(), "%Y")) - 12, as.integer(format(Sys.Date(), "%Y")) - 2)
 
 #Contagem de homicídios registrados, por ano e UF
 sim_doext |> 
@@ -64,7 +71,7 @@ sim_doext |>
 
 ##Importando população.
 #Caminho do excel com pnadc
-excel_pnadc <- here::here("populacao/Pop_Geral_UFs_PNADc.xlsx")
+excel_pnadc <- paste0(dirname(getwd()),"/bases/populacao/Pop_Geral_UFs_PNADc.xlsx") 
 
 #Importação e empilhando os últimos dez anos da PNADc
 pop_pnadc <- map_dfr(
@@ -142,7 +149,7 @@ base |> select(ano,def_uf_resd,tx_homic) |>
   adorn_title(placement = "top", row_name = "",
               col_name = glue::glue("Taxa de Homicídios, por UF {min(year)}–{max(year)}") ) |> 
   #Exportando tabela.
-  rio::export(x= _ ,"base/tx_homicidio_uf_br.xlsx")
+  rio::export(x= _ ,"base/homic/base/tx_homicidio_uf_br.xlsx")
 
 
 # Homicídios de Jovens ------------------------------------------
@@ -152,7 +159,8 @@ library(janitor)
 here::i_am("Rotinas/Tabelas Padrão - Atlas 2026.R") 
 #Importação base de interesse
 load(paste0(dirname(getwd()),"/bases/sim/RData/sim_doext_14_24.Rdata"))
-year <- c(2014:2024)
+#últimos dez anos
+year <- seq(as.integer(format(Sys.Date(), "%Y")) - 12, as.integer(format(Sys.Date(), "%Y")) - 2)
 
 #Contagem de homicídios registrados, por ano e UF
 sim_doext |> 
@@ -236,12 +244,12 @@ base |> select(ano,def_uf_resd, homicidio) |>
   as_tibble() |>
   #Nota de rodapé
   add_row(
-    def_uf_resd = "Fonte: IBGE - Pesquisa Nacional por Amostra de Domicílios Contínua (PNADc) e MS/SVS/CGIAE - Sistema de Informações sobre Mortalidade (SIM). Elaboração: Diest/Ipea e FBSP. Nota: O número de homicídios foi obtido pela soma das seguintes CIDs 10: X85-Y09 e Y35 - Y36, ou seja, óbitos causados por agressão, intervenção legal e operações de guerra.") |>
+    def_uf_resd = "MS/SVSA/CGIAE - Sistema de Informações sobre Mortalidade (SIM). Elaboração: Diest/Ipea e FBSP. Nota: O número de homicídios foi obtido pela soma das seguintes CIDs 10: X85-Y09 e Y35 - Y36, ou seja, óbitos causados por agressão, intervenção legal e operações de guerra.") |>
   #Título da Tabela
   adorn_title(placement = "top", row_name = "",
-              col_name = glue::glue(" Homicídios de Jovens, por UF {min(year)}–{max(year)}") ) |>
+              col_name = glue::glue("Homicídios de Jovens (15 a 29 anos), por UF {min(year)}–{max(year)}") ) |>
   #Exportando tabela.
-  rio::export(x= _ ,"base/n_homicidio_jovem_uf_br.xlsx")
+  rio::export(x= _ ,"base/homic/base/n_homicidio_jovem_uf_br.xlsx")
 
 
 ### Tabela com taxa de homicídios Jovens
@@ -279,9 +287,9 @@ base |> select(ano,def_uf_resd, tx_homic) |>
     def_uf_resd = "Fonte: IBGE - Pesquisa Nacional por Amostra de Domicílios Contínua (PNADc) e MS/SVSA/CGIAE - Sistema de Informações sobre Mortalidade (SIM). Elaboração: Diest/Ipea e FBSP. Nota: O número de homicídios na UF de residência foi obtido pela soma das seguintes CIDs 10: X85-Y09 e Y35 - Y36, ou seja, óbitos causados por agressão, intervenção legal e operações de guerra.") |>
   #Título da Tabela
   adorn_title(placement = "top", row_name = "",
-              col_name = glue::glue("Taxa de Homicídios de Jovens, por UF {min(year)}–{max(year)}") ) |>
+              col_name = glue::glue("Taxa de Homicídios de Jovens (15 a 29 anos), por UF {min(year)}–{max(year)}") ) |>
   #Exportando tabela.
-  rio::export(x= _ ,"base/taxa_homicidio_jovem_uf_br.xlsx")
+  rio::export(x= _ ,"base/homic/base/taxa_homicidio_jovem_uf_br.xlsx")
 rm(base)
 
 
@@ -292,7 +300,8 @@ library(janitor)
 here::i_am("Rotinas/Tabelas Padrão - Atlas 2026.R") 
 #Importação base de interesse
 load(paste0(dirname(getwd()),"/bases/sim/RData/sim_doext_14_24.Rdata"))
-year <- c(2014:2024)
+#últimos dez anos
+year <- seq(as.integer(format(Sys.Date(), "%Y")) - 12, as.integer(format(Sys.Date(), "%Y")) - 2)
 
 
 #Contagem de homicídios registrados, por ano e UF
@@ -384,7 +393,7 @@ base |> select(ano,def_uf_resd, homicidio) |>
               col_name = glue::glue("Número de Homicídios Homens Jovens, por UF {min(year)}–{max(year)}") ) |>
   
   #Exportando tabela.
-  rio::export(x= _ ,"base/n_homicidio_homem_jovem_uf_br.xlsx")
+  rio::export(x= _ ,"base/homic/base/n_homicidio_homem_jovem_uf_br.xlsx")
 
 ###Taxa de homicídio homem jovem ###
 
@@ -423,7 +432,7 @@ base |> select(ano,def_uf_resd, tx_homic) |>
   adorn_title(placement = "top",
               col_name = glue::glue("Taxa de Homicídios de Homens Jovens, por UF {min(year)}–{max(year)}") ) |>
   #Exportando tabela.
-  rio::export(x= _ ,"base/taxa_homicidio_homem_jovem_uf_br.xlsx")
+  rio::export(x= _ ,"base/homic/base/tx_homicidio_homem_jovem_uf_br.xlsx")
 rm(base)
 
 
@@ -435,7 +444,9 @@ library(janitor)
 here::i_am("Rotinas/Tabelas Padrão - Atlas 2026.R") 
 #Importação base de interesse
 load(paste0(dirname(getwd()),"/bases/sim/RData/sim_doext_14_24.Rdata"))
-year <- c(2014:2024)
+#últimos dez anos
+year <- seq(as.integer(format(Sys.Date(), "%Y")) - 12, as.integer(format(Sys.Date(), "%Y")) - 2)
+
 
 
 #Carregando base populacional. Microdado RIPSA.
@@ -538,7 +549,7 @@ base |> select(ano,def_uf_resd, homic) |>
   adorn_title(placement = "top", row_name = "",
               col_name = glue::glue("Número de homicídios registrados de infantes (0 a 4 anos), por UF {min(year)}–{max(year)}") ) |>
   #Exportando tabela.
-  rio::export(x= _ ,"base/n_homicidio_infatil04_uf_br.xlsx")
+  rio::export(x= _ ,"base/homic/base/n_homicidio_infatil04_uf_br.xlsx")
 
 
 #Tabela formato wide da taxa de homicídios de infantes 0 a 4 anos.
@@ -574,7 +585,7 @@ base |> select(ano,def_uf_resd, tx_homic) |>
   adorn_title(placement = "top", row_name = "",
               col_name = glue::glue("Taxa de homicídios registrados de infantes (0 a 4 anos), por UF {min(year)}–{max(year)}") ) |>
   #Exportando tabela.
-  rio::export(x = _ ,"base/taxa_homicidio_infantil04_uf_br.xlsx")
+  rio::export(x = _ ,"base/homic/base/tx_homicidio_infantil04_uf_br.xlsx")
 
 
 
@@ -586,7 +597,8 @@ library(janitor)
 here::i_am("Rotinas/Tabelas Padrão - Atlas 2026.R") 
 #Importação base de interesse
 load(paste0(dirname(getwd()),"/bases/sim/RData/sim_doext_14_24.Rdata"))
-year <- c(2014:2024)
+#últimos dez anos
+year <- seq(as.integer(format(Sys.Date(), "%Y")) - 12, as.integer(format(Sys.Date(), "%Y")) - 2)
 fxet <- c(5:14)
 
 #Carregando base populacional. Microdado RIPSA.
@@ -689,7 +701,7 @@ base |> select(ano,def_uf_resd, homic) |>
   adorn_title(placement = "top", row_name = "",
               col_name = glue::glue("Número de homicídios registrados de infantes (5 a 14 anos), por UF {min(year)}–{max(year)}") ) |>
   #Exportando tabela.
-  rio::export(x= _ ,"base/n_homicidio_infatil5_14_uf_br.xlsx")
+  rio::export(x= _ ,"base/homic/base/n_homicidio_infatil5_14_uf_br.xlsx")
 
 
 #Tabela formato wide da taxa de homicídios de infantes 0 a 4 anos.
@@ -725,10 +737,10 @@ base |> select(ano,def_uf_resd, tx_homic) |>
   adorn_title(placement = "top", row_name = "",
               col_name = glue::glue("Taxa de homicídios registrados de infantes (5 a 14 anos), por UF {min(year)}–{max(year)}") ) |>
   #Exportando tabela.
-  rio::export(x = _ ,"base/taxa_homicidio_infantil5_14_uf_br.xlsx")
+  rio::export(x = _ ,"base/homic/base/tx_homicidio_infantil5_14_uf_br.xlsx")
 
 
-rm(list = ls()); gc()
+rm(list = base); gc()
 
 
 # Homicídio adolescente 15 a 19 -------------------------------------------
@@ -738,7 +750,8 @@ library(janitor)
 here::i_am("Rotinas/Tabelas Padrão - Atlas 2026.R") 
 #Importação base de interesse
 load(paste0(dirname(getwd()),"/bases/sim/RData/sim_doext_14_24.Rdata"))
-year <- c(2014:2024)
+#últimos dez anos
+year <- seq(as.integer(format(Sys.Date(), "%Y")) - 12, as.integer(format(Sys.Date(), "%Y")) - 2)
 fxet <- c(15:19)
 
 #Carregando base populacional. Microdado RIPSA.
@@ -841,7 +854,7 @@ base |> select(ano,def_uf_resd, homic) |>
   adorn_title(placement = "top", row_name = "",
               col_name = glue::glue("Número de homicídios registrados de infantes (15 a 19 anos), por UF {min(year)}–{max(year)}") ) |>
   #Exportando tabela.
-  rio::export(x= _ ,"base/n_homicidio_infatil15_19_uf_br.xlsx")
+  rio::export(x= _ ,"base/homic/base/n_homicidio_infatil15_19_uf_br.xlsx")
 
 
 #Tabela formato wide da taxa de homicídios de infantes 0 a 4 anos.
@@ -877,11 +890,11 @@ base |> select(ano,def_uf_resd, tx_homic) |>
   adorn_title(placement = "top", row_name = "",
               col_name = glue::glue("Taxa de homicídios registrados de infantes (15 a 19 anos), por UF {min(year)}–{max(year)}") ) |>
   #Exportando tabela.
-  rio::export(x = _ ,"base/taxa_homicidio_infantil15_19_uf_br.xlsx")
+  rio::export(x = _ ,"base/homic/base/tx_homicidio_infantil15_19_uf_br.xlsx")
 
 rm(list = ls()); gc()
 
-
+                                              
 
 # Instrumento de óbito de infantes, crianças e adolescentes ---------------
 library(tidyverse)
@@ -890,9 +903,10 @@ library(janitor)
 here::i_am("Rotinas/Tabelas Padrão - Atlas 2026.R") 
 #Importação base de interesse
 load(paste0(dirname(getwd()),"/bases/sim/RData/sim_doext_14_24.Rdata"))
-year <- c(2014:2024)
+#últimos dez anos
+year <- seq(as.integer(format(Sys.Date(), "%Y")) - 12, as.integer(format(Sys.Date(), "%Y")) - 2)
 
-
+#Tabela
 sim_doext |> 
   
   filter(ano %in% year) |>
@@ -918,11 +932,14 @@ sim_doext |>
   #Mantém somente homicídios e exclui faixa etária sem interesse.
   filter(fxet != "Restante" & intencao_homic == "Homicídio") |> droplevels() |>
   
-  tabyl(instrumento,fxet) %>% adorn_totals(where = c("row","col")) %>%
-  adorn_percentages(denominator  = "col") %>% adorn_pct_formatting(digits = 1) %>%
-  adorn_ns(position = "front",  format_func = function(x) { format(x, big.mark = ".", decimal.mark = ",") } ) |>
+  tabyl(instrumento,fxet) %>% adorn_totals(where = c("row","col")) |>
+  #Substituir valores absolutos no excel
+  rio::export(x = _, "base/eca/base/n_homic_instrumento_eca.xlsx")
 
-  rio::export(x = _, "base/instrumento_eca.xlsx")
+  # adorn_percentages(denominator  = "col") %>% adorn_pct_formatting(digits = 1) %>%
+  # adorn_ns(position = "front",  format_func = function(x) { format(x, big.mark = ".", decimal.mark = ",") } ) 
+
+ 
 
 
 # Homicídio Mulheres ------------------------------------------------------
