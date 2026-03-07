@@ -20,11 +20,6 @@ sinan %>% filter(!is.na(idade) & grupo_viol!="Autoprovocada" & ano_not %in% year
 
 
 
-
-
-
-
-
 #Tabela 4.5 Brasil: Distribuição da violência contra crianças e adolescentes por local da violência e faixa etária da vítima (2011-2021)*
 #Criando  Faixa crianças e jovens
 sinan %>% filter(!is.na(idade) & grupo_viol!="Autoprovocada" & ano_not %in% year) |>
@@ -43,34 +38,40 @@ sinan %>% filter(!is.na(idade) & grupo_viol!="Autoprovocada" & ano_not %in% year
   adorn_percentages("col") %>% adorn_pct_formatting(digits = 1) |>
   #Ordem das colunas na tabela.
   select("Local da Violência" = local_ocor,"0 a 4","5 a 14","15 a 19") |>
-  rio::export(x=_,"eca_local_fxet.xlsx")
+  rio::export(x=_,"base/eca/base/sinan_eca_local_fxet.xlsx")
 
 
 #Tabela 4.12 Brasil: Distribuição da violência contra crianças e adolescentes por autor da violência
 #Grupo autor da violência
 sinan %>% filter(!is.na(idade) & grupo_viol!="Autoprovocada" & ano_not %in% year ) |>
-  mutate(fxet_eca = as.factor(case_when(
+  mutate(
+    fxet_eca = as.factor(case_when(
     idade<=4 ~ "0 a 4",
     idade>=5 & idade<=14 ~ "5 a 14",
     idade>=15 & idade<=19 ~ "15 a 19",
     TRUE ~ "Outras")),
+    #Exclusão de factor não utilizado (autoprovocada)
+    grupo_viol = grupo_viol |> fct_drop(),
+    
     grupo_viol = grupo_viol |> fct_relevel("Doméstica", "Comunitária",
                                            "Institucional","Misto") ) |>
   tabyl(grupo_viol,fxet_eca,show_na = T, show_missing_levels = T) |>
-  adorn_totals(c("row", "col")) %>%
-  adorn_percentages("col") %>% adorn_pct_formatting(digits = 1) %>%
-  adorn_ns(position = "front") |>
+  adorn_totals(c("row", "col")) |>
+  # adorn_percentages("col") %>% adorn_pct_formatting(digits = 1) %>%
+  # adorn_ns(position = "front") |>
   #Colocando vírgula no lugar de ponto.
   mutate(across(where(is.character), ~ str_replace_all(as.character(.x), "\\,", "."))) |>
   #Ordem das colunas na tabela.
-  select("Autoria" = grupo_viol,"0 a 4","5 a 14","15 a 19") |>
-  rio::export(x=_,"eca_grupo_viol_fxet.xlsx")
+  select("Autoria" = grupo_viol,"0 a 4","5 a 14","15 a 19",Total) |>  
+
+  rio::export(x=_,"base/eca/base/sinan_eca_grupo_viol_fxet.xlsx")
 
 #Número de violência física contra crianças e adolescentes – Brasil
 sinan |>
-  filter(t_viol == "V.Física" & grupo_viol!="Autoprovocada" & ano_not %in% year) |> droplevels() |>
+  filter(t_viol == "V.Física" & grupo_viol!="Autoprovocada" & ano_not %in% year) |>
    #Criando faixa etária
-  mutate(fxet_eca = as.factor(case_when(
+  mutate(
+    fxet_eca = as.factor(case_when(
     idade<=4 ~ "0 a 4",
     idade>=5 & idade<=14 ~ "5 a 14",
     idade>=15 & idade<=19 ~ "15 a 19",
@@ -78,12 +79,14 @@ sinan |>
   #Notificações violência física por ano
   tabyl(fxet_eca,ano_not) |>
   #Ordenando as linhas da tabela
-  slice(match(c("0 a 4", "5 a 14", "15 a 19"),fxet_eca)) |> rio::export(x=_,"eca_viol_fisc_fxet.xlsx")
+  slice(match(c("0 a 4", "5 a 14", "15 a 19"),fxet_eca)) |>  
+  
+  rio::export(x=_,"base/eca/base/sinan_eca_viol_fisc_fxet.xlsx")
 
 
 #Número de violência sexual contra crianças e adolescentes – Brasil
 sinan |>
-  filter(t_viol == "V.Sexual" & grupo_viol!="Autoprovocada" & ano_not %in% year) |> droplevels() |>
+  filter(t_viol == "V.Sexual" & grupo_viol!="Autoprovocada" & ano_not %in% year) |>
   #Criando faixa etária
   mutate(fxet_eca = as.factor(case_when(
     idade<=4 ~ "0 a 4",
@@ -93,12 +96,13 @@ sinan |>
   #Notificações violência física por ano
   tabyl(fxet_eca,ano_not) |>
   #Ordenando as linhas da tabela
-  slice(match(c("0 a 4", "5 a 14", "15 a 19"),fxet_eca)) |> rio::export(x=_,"eca_viol_sex_fxet.xlsx")
+  slice(match(c("0 a 4", "5 a 14", "15 a 19"),fxet_eca)) |> 
+  rio::export(x=_,"base/eca/base/sinan_eca_viol_sex_fxet.xlsx")
 
 
 #Número de violência psicológica contra crianças e adolescentes
 sinan |>
-  filter(t_viol == "V.Psico" & grupo_viol!="Autoprovocada" & ano_not %in% year) |> droplevels() |>
+  filter(t_viol == "V.Psico" & grupo_viol!="Autoprovocada" & ano_not %in% year) |> 
   #Criando faixa etária
   mutate(fxet_eca = as.factor(case_when(
     idade<=4 ~ "0 a 4",
@@ -108,12 +112,14 @@ sinan |>
   #Notificações violência física por ano
   tabyl(fxet_eca,ano_not) |>
   #Ordenando as linhas da tabela
-  slice(match(c("0 a 4", "5 a 14", "15 a 19"),fxet_eca)) |> rio::export(x=_,"eca_viol_psic_fxet.xlsx")
+  slice(match(c("0 a 4", "5 a 14", "15 a 19"),fxet_eca)) |> 
+  
+  rio::export(x=_,"base/eca/base/sinan_eca_viol_psic_fxet.xlsx")
 
 
 #Número de negligência/abandono de crianças e adolescentes por faixa etária
 sinan |>
-  filter(t_viol == "Negligência" & grupo_viol!="Autoprovocada" & ano_not %in% year) |> droplevels() |>
+  filter(t_viol == "Negligência" & grupo_viol!="Autoprovocada" & ano_not %in% year) |> 
   #Criando faixa etária
   mutate(fxet_eca = as.factor(case_when(
     idade<=4 ~ "0 a 4",
@@ -123,7 +129,9 @@ sinan |>
   #Notificações violência física por ano
   tabyl(fxet_eca,ano_not) |>
   #Ordenando as linhas da tabela
-  slice(match(c("0 a 4", "5 a 14", "15 a 19"),fxet_eca)) |> rio::export(x=_,"eca_viol_negli_fxet.xlsx")
+  slice(match(c("0 a 4", "5 a 14", "15 a 19"),fxet_eca)) |>
+  
+  rio::export(x=_,"base/eca/base/sinan_eca_viol_negli_fxet.xlsx")
 
 
 
@@ -150,11 +158,13 @@ sinan |>
   guides(color = guide_legend(position = "inside",title.position = "top") ) +
   theme(strip.text = element_text(size=10, face="bold"),legend.title = element_text(face="bold"),
         legend.text = element_text(face = "bold",size = 10),
-        legend.position.inside = c(0.1, 0.4),legend.direction = "horizontal",
+        legend.key =  element_rect(fill = "transparent", colour = NA),
+        legend.position.inside = c(0.1, 0.4),
+        legend.direction = "horizontal",
         legend.background = element_rect(fill = "transparent", colour = NA)) +
   labs(x="",y="",color = "Faixa Etária")
-ggsave(filename = "V. não letal_eca.bmp", width = 15,height = 10,dpi=250)
-ggsave(filename = "V. não letal_eca.eps", width = 15,height = 10,dpi=350)
+ggsave(filename = "base/eca/figura/V. não letal_eca.bmp", width = 15,height = 10,dpi=250)
+ggsave(filename = "base/eca/figura/V. não letal_eca.eps", width = 15,height = 10,dpi=350)
 
 
 #tabela de proporção por sexo.
