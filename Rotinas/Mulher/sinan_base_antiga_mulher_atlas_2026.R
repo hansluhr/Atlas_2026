@@ -1,14 +1,20 @@
 library(tidyverse)
 library(janitor)
+
+#Declarando pasta raiz
+here::i_am(here::i_am("/Mulher/sinan_base_antiga_mulher_atlas_2026.R") )
 #Importando base
-load("C:/Users/gabli/Desktop/r/Sinan/sinan_13_2023_preliminar_transtorno.RData")
-year <- 2023
+load(paste0(dirname(getwd()),"/bases/sinan_violencia/sinan_14_24_transtorno.RData") )
+#Ano de interesse. Último ano
+year <- as.integer(format(Sys.Date(), "%Y")) - 2
 
 
 #Grupo\Autoria da Violência
 sinan |> filter(grupo_viol != "Autoprovocada" & cs_sexo == "F"  & ano_not %in% year) |>
   tabyl(grupo_viol, show_missing_levels = FALSE, show_na = FALSE) |> arrange(desc(n)) |> adorn_totals(where = "row")  |>
-  adorn_pct_formatting(digits = 1) |> rio::export(x = _, "mulher_grupo_viol.xlsx")
+  adorn_pct_formatting(digits = 1) |> 
+  rio::export(x = _, "base/mulheres/base/sinan_mulher_grupo_viol.xlsx")
+
 #Proporção dos prováveis autores\grupo de violência
 
 
@@ -17,13 +23,14 @@ sinan |> filter(grupo_viol != "Autoprovocada"  & cs_sexo == "F"  & ano_not %in% 
   tabyl(t_viol,grupo_viol,#cs_raca,
         show_missing_levels = FALSE, show_na = FALSE) %>% adorn_totals(where=c("col","row")) %>%
   adorn_percentages(denominator = "col") %>%  adorn_pct_formatting(digits = 1, affix_sign = TRUE,) |> 
-  adorn_ns(position = "front", format_func = function(x) { format(x, big.mark = ".", decimal.mark = ",") } ) |> 
-  rio::export(x=_,"t_violência_por_grupo_autoria.xlsx")
+  adorn_ns(position = "front", format_func = function(x) { format(x, big.mark = ".", decimal.mark = ",") } ) |>
+  adorn_title(row_name = "Tipo de Violência", col_name = "Grupo agressor", placement = "combined") |>
+  rio::export(x=_,"base/mulheres/base/sinan_t_violência_por_grupo_autoria.xlsx")
 #Das violências domésticas, x% são violência física.  
 
 
 #Local de Ocorrência da violência 
-sinan |> filter(grupo_viol != "Autoprovocada" & grupo_viol == "Doméstica" & cs_sexo == "F" & ano_not %in% year) |>
+sinan |> filter(grupo_viol != "Autoprovocada" & cs_sexo == "F" & ano_not %in% year) |>
   #Ordem de apresentação de local de ocorrência
   mutate(local_ocor = local_ocor |> fct_relevel("Residência","Via pública",
                                                 "Ignorado","Outro","Bar ou similar",
@@ -34,7 +41,8 @@ sinan |> filter(grupo_viol != "Autoprovocada" & grupo_viol == "Doméstica" & cs_
         show_missing_levels = FALSE, show_na = FALSE) %>% adorn_totals(where=c("col","row")) %>%
   adorn_percentages(denominator = "col") %>%  adorn_pct_formatting(digits = 1,affix_sign = TRUE) |> 
   adorn_ns(position = "front", format_func = function(x) { format(x, big.mark = ".", decimal.mark = ",") }) |>
-  rio::export(x=_,"local_ocor_por_grupo_autoria.xlsx")
+  adorn_title(row_name = "Local da ocorrência", col_name = "Grupo agressor", placement = "combined")  |>
+  rio::export(x=_,"base/mulheres/base/sinan_local_ocor_por_grupo_autoria.xlsx")
 #Das violências domésticas, x% ocorrem na residência. 
 
 
@@ -44,7 +52,8 @@ sinan |> filter(grupo_viol != "Autoprovocada" &  cs_sexo == "F" & ano_not %in% y
         show_missing_levels = FALSE, show_na = FALSE) %>% adorn_totals(where=c("col","row")) %>%
   adorn_percentages(denominator = "col") %>% adorn_pct_formatting(digits = 1,affix_sign = TRUE) |> 
   adorn_ns(position = "front", format_func = function(x) { format(x, big.mark = ".", decimal.mark = ",") }) |> 
-  rio::export(x=_,"situacao_conjugal_por_grupo_autoria.xlsx")
+  adorn_title(row_name = "Situação Conjugal", col_name = "Grupo agressor", placement = "combined") |>
+  rio::export(x=_,"base/mulheres/base/sinan_situacao_conjugal_por_grupo_autoria.xlsx")
 #Das violências domésticas, x% são Solteiras. 
 
 #Ocorreu outraz vezes?
@@ -54,7 +63,8 @@ sinan |> filter(grupo_viol != "Autoprovocada" & cs_sexo == "F" & ano_not %in% ye
   adorn_totals(where=c("col","row")) %>%
   adorn_percentages(denominator = "col") %>% adorn_pct_formatting(digits = 1,affix_sign = TRUE) |> 
   adorn_ns(position = "front", format_func = function(x) { format(x, big.mark = ".", decimal.mark = ",") }) |> 
-  rio::export(x=_,"ocorreu_outra_vez_por_grupo_autoria.xlsx")
+  adorn_title(row_name = "Reincidência", col_name = "Grupo agressor", placement = "combined") |>
+  rio::export(x=_,"base/mulheres/base/sinan_ocorreu_outra_vez_por_grupo_autoria.xlsx")
 #Das violências domésticas, x% a violência é repetição. 
 
 #Instrumento da ocorrência
@@ -104,13 +114,14 @@ sinan %>% mutate(fxet = as.factor(
 
 
 #Faixa etária por autoria\grupo de violência
-sinan |> filter(grupo_viol != "Autoprovocada" & grupo_viol == "Doméstica" & cs_sexo == "F" & ano_not %in% year) |> droplevels() |>
-  tabyl(fxet,autor_sexo,
-        show_missing_levels = FALSE, show_na = FALSE) %>% 
-  adorn_totals(where=c("col","row") ) %>%
-  adorn_percentages(denominator = "col") %>%  adorn_pct_formatting(digits = 1,affix_sign = TRUE) |> 
-  adorn_ns(position = "front", format_func = function(x) { format(x, big.mark = ".", decimal.mark = ",") }) |> 
-  rio::export(x=_,"faixa_etaria_sexo_autor_por_grupo_autoria.xlsx")
+# sinan |> filter(grupo_viol != "Autoprovocada" & cs_sexo == "F" & ano_not %in% year) |> droplevels() |>
+#   tabyl(fxet,autor_sexo,
+#         show_missing_levels = FALSE, show_na = FALSE) %>% 
+#   adorn_totals(where=c("col","row") ) %>%
+#   adorn_percentages(denominator = "col") %>%  adorn_pct_formatting(digits = 1,affix_sign = TRUE) |> 
+#   adorn_ns(position = "front", format_func = function(x) { format(x, big.mark = ".", decimal.mark = ",") })  
+#   adorn_title(row_name = "Faixa Etária", col_name = "sexo do Agressor", placement = "combined") |>
+#   rio::export(x=_,"faixa_etaria_sexo_autor_por_grupo_autoria.xlsx")
 
 
 
@@ -122,7 +133,8 @@ sinan |> filter(grupo_viol != "Autoprovocada" & cs_sexo == "F" & ano_not %in% ye
   adorn_totals(where=c("col","row") ) %>%
   adorn_percentages(denominator = "col") %>%  adorn_pct_formatting(digits = 1,affix_sign = TRUE) |> 
   adorn_ns(position = "front", format_func = function(x) { format(x, big.mark = ".", decimal.mark = ",") }) |> 
-  rio::export(x=_,"faixa_etaria_sexo_autor_por_grupo_autoria.xlsx")
+  adorn_title(row_name = "Faixa Etária", col_name = "Grupo Agressor", placement = "combined") |>
+  rio::export(x=_,"base/mulheres/base/sinan_faixa_etaria_por_grupo_autoria.xlsx")
 #Das violências domésticas, x% são na faixa 30 a 34. 
 #Olhar sexo do provável autor da agressão.
 
@@ -133,8 +145,9 @@ sinan |> filter(grupo_viol != "Autoprovocada" & grupo_viol == "Doméstica" &  cs
         show_missing_levels = FALSE, show_na = FALSE
   ) %>% adorn_totals(where=c("col","row")) %>%
   adorn_percentages(denominator = "col") %>%  adorn_pct_formatting(digits = 1,affix_sign = TRUE) |> 
-  adorn_ns(position = "front", format_func = function(x) { format(x, big.mark = ".", decimal.mark = ",") }) |> 
-  rio::export(x=_,"faixa_etaria_por_tipo_violência.xlsx")
+  adorn_ns(position = "front", format_func = function(x) { format(x, big.mark = ".", decimal.mark = ",") }) |>
+  adorn_title(row_name = "Faixa Etária", col_name = "Tipo de Violência", placement = "combined") |>
+  rio::export(x=_,"base/mulheres/base/sinan_faixa_etaria_por_tipo_violência.xlsx")
 #Da viol sexual, 46,8% são na faixa 10 a 14. 
 
 
@@ -170,8 +183,9 @@ sinan |> filter(grupo_viol != "Autoprovocada" & grupo_viol == "Doméstica"  & cs
   tabyl(cs_raca,t_viol , show_missing_levels = FALSE, show_na = FALSE
   ) %>% adorn_totals(where=c("col","row")) %>%
   adorn_percentages(denominator = "row") %>%  adorn_pct_formatting(digits = 1,affix_sign = TRUE) |> 
-  adorn_ns(position = "front", format_func = function(x) { format(x, big.mark = ".", decimal.mark = ",") }) |> 
-  rio::export(x = _, "cs_raca_x_t_viol_doméstica.xlsx")
+  adorn_ns(position = "front", format_func = function(x) { format(x, big.mark = ".", decimal.mark = ",") }) |>
+  adorn_title(row_name = "Raça\\cor", col_name = "Tipo de Violência", placement = "combined") |>
+  rio::export(x = _, "base/mulheres/base/sinan_cs_raca_x_t_viol_doméstica.xlsx")
 
 #Raca\cor por escolaridade
 sinan |> filter(grupo_viol != "Autoprovocada" & grupo_viol == "Doméstica"  & cs_sexo == "F" & ano_not %in% year) |> 
@@ -182,7 +196,7 @@ sinan |> filter(grupo_viol != "Autoprovocada" & grupo_viol == "Doméstica"  & cs
     "Educação superior incompleta","Educação superior completa","Ignorado","Não se aplica","Missing") ) |>
   tabyl(cs_raca,cs_escol_n , show_missing_levels = FALSE, show_na = FALSE) %>% adorn_totals(where=c("col","row")) %>%
   adorn_percentages(denominator = "row") %>%  adorn_pct_formatting(digits = 1,affix_sign = TRUE) |> 
-  adorn_ns(position = "front") |> rio::export(x = _, "cs_raca_x_escol_doméstica.xlsx")
+  adorn_ns(position = "front") |> rio::export(x = _, "base/mulheres/base/sinan_cs_raca_x_escol_doméstica.xlsx")
 #Dos brancos, 5,3% são 1ª a 4ª série incompleta do EF
 
 #Raça\cor por faixa etária
@@ -190,7 +204,7 @@ sinan |> filter(grupo_viol != "Autoprovocada" & grupo_viol == "Doméstica"  & cs
   tabyl(fxet,cs_raca , show_missing_levels = FALSE, show_na = FALSE
   ) %>% adorn_totals(where=c("col","row")) %>%
   adorn_percentages(denominator = "row") %>%  adorn_pct_formatting(digits = 1,affix_sign = TRUE) |> 
-  adorn_ns(position = "front") |> rio::export(x = _, "fxet_x_cs_raca_doméstica.xlsx")
+  adorn_ns(position = "front") |> rio::export(x = _, "base/mulheres/base/sinan_fxet_x_cs_raca_doméstica.xlsx")
 #Na fxet 0 a 9, os brancos são 39,1% 
 
 
@@ -199,11 +213,11 @@ sinan |> filter(grupo_viol != "Autoprovocada" & grupo_viol == "Doméstica"  & cs
   tabyl(cs_raca,sit_conjug , show_missing_levels = FALSE, show_na = FALSE
   ) %>% adorn_totals(where=c("col","row")) %>%
   adorn_percentages(denominator = "row") %>%  adorn_pct_formatting(digits = 1,affix_sign = TRUE) |> 
-  adorn_ns(position = "front") |> rio::export(x = _, "cs_raca_x_sit_conj_doméstica.xlsx")
+  adorn_ns(position = "front") |> rio::export(x = _, "base/mulheres/base/sinan_cs_raca_x_sit_conj_doméstica.xlsx")
 #Dos pardos 32,2% são Casado-União Consensual
 
 
 #Suspeita de álcool
 sinan |> filter(grupo_viol != "Autoprovocada" & grupo_viol == "Doméstica"  & cs_sexo == "F" & ano_not %in% year) |> 
-  tabyl(autor_alco) |> rio::export(x=_,"alco_doméstica.xlsx")
+  tabyl(autor_alco) |> rio::export(x=_,"base/mulheres/base/sinan_alco_doméstica.xlsx")
 #Em ao menos 33,05% das notificações de violência doméstica contra mulher, o autor estava com suspeita de uso de álcool. 
