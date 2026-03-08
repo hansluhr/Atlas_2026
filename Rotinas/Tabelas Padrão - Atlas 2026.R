@@ -1222,8 +1222,7 @@ library(janitor)
 here::i_am("Rotinas/Tabelas Padrão - Atlas 2026.R") 
 #Importação base de interesse
 load(paste0(dirname(getwd()),"/bases/sim/RData/sim_doext_14_24.Rdata"))
-year <- c(2014:2024)
-
+year <- seq(as.integer(format(Sys.Date(), "%Y")) - 12, as.integer(format(Sys.Date(), "%Y")) - 2);gc()
 
 #Contagem de homicídios registrados, por ano e UF
 sim_doext |> 
@@ -1311,7 +1310,7 @@ base |> select(ano,def_uf_resd,homicidio) |>
   adorn_title(placement = "top", row_name = "",
               col_name = glue::glue("Homicídios de mulheres, por UF {min(year)}–{max(year)}") ) |> 
   #Exportando tabela.
-  rio::export(x= _ ,"base/n_homicidio_mulher_uf_br.xlsx")
+  rio::export(x= _ ,"base/mulheres/base/n_homicidio_mulher_uf_br.xlsx")
 
 
 #Tabela formato wide da taxa de homicídios de mulheres.
@@ -1347,7 +1346,7 @@ base |> select(ano, def_uf_resd, tx_homic) |>
   adorn_title(placement = "top", row_name = "",
               col_name = glue::glue("Taxa de homicídios de mulheres, por UF {min(year)}–{max(year)}") )  |>
   #Exportando tabela.
-  rio::export(x= _ ,"base/taxa_homicidio_mulher_uf_br.xlsx")
+  rio::export(x= _ ,"base/mulheres/base/tx_homicidio_mulher_uf_br.xlsx")
 
 
 
@@ -1360,7 +1359,7 @@ base |>
   #Filtro das três UFs de maior taxa em 2023 + a taxa Brasil
   filter(def_uf_resd %in% c(def_uf_resd[1:4]) | def_uf_resd == "Brasil") |>
   #Exportando ranking das UFs mais violêntas, mulher
-  rio::export(x = _, "base/ranking_tx_homic_mulher.xlsx")
+  rio::export(x = _, "base/mulheres/base/ranking_tx_homic_mulher.xlsx")
 
 rm(list = ls())
 
@@ -1371,14 +1370,13 @@ library(janitor)
 here::i_am("Rotinas/Tabelas Padrão - Atlas 2026.R") 
 #Importação base de interesse
 load(paste0(dirname(getwd()),"/bases/sim/RData/sim_doext_14_24.Rdata"))
-year <- c(2014:2024)
+year <- seq(as.integer(format(Sys.Date(), "%Y")) - 12, as.integer(format(Sys.Date(), "%Y")) - 2);gc()
 
 #Homicídio feminino, local do acidente = residencial. Aqui poderia entrar Habitação coletiva
 sim_doext |> 
   
-  filter(ano %in% year) |>
+  filter(ano %in% year & intencao_homic == "Homicídio" & def_sexo == "Mulher")  |> droplevels() |>
   
-  filter(intencao_homic == "Homicídio" & def_sexo == "Mulher")  |> droplevels() |>
   tabyl(ano,local_incd) |>
   #Homicídios fora da residência. Somatório de todos os locais do incidente, exceto Residencial. Entendo que Hab Coletiva é residencia.
   mutate(homic_out = rowSums(across(!c(ano,Residencial)))) |> 
@@ -1422,7 +1420,7 @@ left_join(pop_pnadc, homic_fem, by = join_by("ano") ) |>
   
   pivot_wider(names_from = ano, values_from = taxa) |> 
   #Exportando.
-  rio::export(x=_,"base/tx_homic_fem_resd_out.xlsx")
+  rio::export(x=_,"base/mulheres/base/tx_homic_fem_resd_out.xlsx")
 
 rm(list = ls() )
 
@@ -1434,7 +1432,8 @@ library(janitor)
 here::i_am("Rotinas/Tabelas Padrão - Atlas 2026.R") 
 #Importação base de interesse
 load(paste0(dirname(getwd()),"/bases/sim/RData/sim_doext_14_24.Rdata"))
-year <- c(2014:2024)
+year <- seq(as.integer(format(Sys.Date(), "%Y")) - 12, as.integer(format(Sys.Date(), "%Y")) - 2);gc()
+
 
 #Contagem de homicídios registrados, por ano e UF
 sim_doext |> 
@@ -1523,7 +1522,7 @@ base |> select(ano,def_uf_resd,homicidio) |>
   adorn_title(placement = "top", row_name = "",
   col_name = glue::glue("Homicídios de mulheres negras, por UF {min(year)}–{max(year)}") ) |>                               
   #Exportando tabela.
-  rio::export(x = _ ,"base/n_homicidio_mulher_negra_uf_br.xlsx")
+  rio::export(x = _ ,"base/mulheres/base/n_homicidio_mulher_negra_uf_br.xlsx")
 
    ### Taxa de homicídios de mulheres negras ###
 
@@ -1561,7 +1560,7 @@ base |> select(ano, def_uf_resd, tx_homic) |>
   adorn_title(placement = "top", row_name = "",
               col_name = glue::glue("Taxa de homicídios de mulheres negras, por UF {min(year)}–{max(year)}") ) |> 
    #Exportando tabela.
-  rio::export(x= _ ,"base/taxa_homicidio_mulher_negra_uf_br.xlsx")
+  rio::export(x= _ ,"base/mulheres/base/tx_homicidio_mulher_negra_uf_br.xlsx")
 
 
 
@@ -1576,7 +1575,7 @@ library(janitor)
 here::i_am("Rotinas/Tabelas Padrão - Atlas 2026.R") 
 #Importação base de interesse
 load(paste0(dirname(getwd()),"/bases/sim/RData/sim_doext_14_24.Rdata"))
-year <- c(2014:2024)
+year <- seq(as.integer(format(Sys.Date(), "%Y")) - 12, as.integer(format(Sys.Date(), "%Y")) - 2);gc()
 
 #Contagem de homicídios registrados, por ano e UF
 sim_doext |> 
@@ -1664,7 +1663,7 @@ base |> select(ano,def_uf_resd,homicidio) |>
   adorn_title(placement = "top", row_name = "",
               col_name = glue::glue("Homicídios de mulheres não negras, por UF {min(year)}–{max(year)}") ) |>
   #Exportando tabela.
-  rio::export(x = _ ,"base/n_homicidio_mulher_nao_negra_uf_br.xlsx")
+  rio::export(x = _ ,"base/mulheres/base/n_homicidio_mulher_nao_negra_uf_br.xlsx")
 
 
 #Tabela formato wide da taxa de homicídios de mulheres não negra.
@@ -1701,7 +1700,7 @@ base |> select(ano, def_uf_resd, tx_homic) |>
   adorn_title(placement = "top", row_name = "",
               col_name = glue::glue("Taxa de homicídios de mulheres negras, por UF {min(year)}–{max(year)}") ) |>
   #Exportando tabela.
-  rio::export(x= _ ,"base/taxa_homicidio_mulher_nao_negra_uf_br.xlsx")
+  rio::export(x= _ ,"base/mulheres/base/tx_homicidio_mulher_nao_negra_uf_br.xlsx")
 
 rm(list = ls() )
 
