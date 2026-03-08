@@ -145,7 +145,7 @@ rm(sinan,sinan_idoso,year)
 library(tidyverse)
 library(janitor)
 
-here::i_am("Rotinas/SINAN_transtorno_atlas_2026.R")
+here::i_am("Rotinas/Idoso/Idoso_atlas_2026_sinan_sih_sim.R")
 #Importando população de idosos.
 #Caminho do excel com pnadc
 excel_pnadc <- paste0(dirname(getwd()),"/bases/populacao/Pop-PNADc-60+.xlsx") 
@@ -179,7 +179,8 @@ rm(list = setdiff(ls(), "pop_pnadc_idoso"))
 
 #Carrgando base SINAN Violência
 load(paste0(dirname(getwd()),"/bases/sinan_violencia/sinan_14_24_transtorno.Rdata") )
-year <- 2014:2024;gc()
+#últimos dez anos
+year <- seq(as.integer(format(Sys.Date(), "%Y")) - 12, as.integer(format(Sys.Date(), "%Y")) - 2);gc()
 
 #Número de notificações de lesão autoprovocada. Usando metodologia do PCD
 sinan %>% filter(ano_not %in% year & idade>=60 & grupo_viol=="Autoprovocada") |> 
@@ -278,7 +279,7 @@ sinan_idoso |> select(ano,uf,tx_nots) |>
   #Título da Tabela
   adorn_title(placement = "top", row_name = "",
               col_name = glue::glue("Taxa de agravos de notificação de lesão autoprovocada de idosos, por UF {min(year)}–{max(year)}") ) |> 
-  rio::export(x = _,"base/idoso/base/taxa_autoprovocadas_idoso.xlsx")
+  rio::export(x = _,"base/idoso/base/tx_autoprovocadas_idoso.xlsx")
 
 rm(sinan,sinan_idoso,year)
 
