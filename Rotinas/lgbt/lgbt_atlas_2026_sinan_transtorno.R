@@ -489,6 +489,34 @@ ggsave("base/lgbt/figuras/Número casos de violência contra homossexuais e biss
   
   
 
+# Motivação das notificações ----------------------------------------------
+library(tidyverse)
+library(janitor)
+
+here::i_am("Rotinas/lgbt/lgbt_atlas_2026_sinan_transtorno.R")
+#Carrgando base SINAN Violência
+load(paste0(dirname(getwd()),"/bases/sinan_violencia/sinan_14_24_transtorno.Rdata") )
+#Anos de interesse. Últimos dez anos.
+year <- seq(as.integer(format(Sys.Date(), "%Y")) - 12, as.integer(format(Sys.Date(), "%Y")) - 2);gc()
+
+
+
+sinan |>
+  filter(ano_not %in% year & grupo_viol!="Autoprovocada") |>
+  tabyl(viol_motiv,ano_not, show_missing_levels = TRUE, show_na = TRUE) %>% 
+  adorn_totals(where=c("col","row") ) %>%
+  adorn_percentages(denominator = "col") %>%  adorn_pct_formatting(digits = 1,affix_sign = TRUE) |> 
+  adorn_ns(position = "front", format_func = function(x) { format(x, big.mark = ".", decimal.mark = ",") }) |> 
+  adorn_title(row_name = "Faixa Etária", col_name = "Grupo Agressor", placement = "combined") |> view()
+
+  #Elevado Ingorado, outros. Não é informativo.
+
+
+
+
+
+
+
 
 
 
