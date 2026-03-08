@@ -2757,7 +2757,8 @@ library(janitor)
 here::i_am("Rotinas/Tabelas Padrão - Atlas 2026.R") 
 #Importação base de interesse
 load(paste0(dirname(getwd()),"/bases/sim/RData/sim_doext_14_24.Rdata"))
-year <- c(2014:2024)
+#Últimos dez anos
+year <- seq(as.integer(format(Sys.Date(), "%Y")) - 12, as.integer(format(Sys.Date(), "%Y")) - 2);gc()
 
 
 #Contagem de homicídios registrados, por ano e UF
@@ -2854,7 +2855,7 @@ base |> select(ano,def_uf_resd,homic_int) |>
   adorn_title(placement = "top", row_name = "",
               col_name = glue::glue("Homicídios por arma de fogo, por UF {min(year)}–{max(year)}") ) |> 
   #Exportando tabela.
-  rio::export(x = _ ,"base/n_homic_paf_uf_resd.xlsx")
+  rio::export(x = _ ,"base/paf/base/n_homic_paf_uf_resd.xlsx")
 
 
 #Tabela formato wide da taxa de homicídios por Arma de fogo.
@@ -2892,7 +2893,7 @@ base |> select(ano, def_uf_resd, tx_homic) |>
   adorn_title(placement = "top", row_name = "",
               col_name = glue::glue("Taxa de homicídios por arma de fogo, por UF {min(year)}–{max(year)}") ) |> 
   #Exportando tabela.
-  rio::export(x= _ ,"base/taxa_homicidio_PAF_uf_br.xlsx")
+  rio::export(x= _ ,"base/paf/base/tx_homicidio_PAF_uf_br.xlsx")
 
 
 #Tabela formato wide da taxa de homicídios por Arma de fogo.
@@ -2928,7 +2929,7 @@ base |> select(ano, def_uf_resd, prop) |>
   adorn_title(placement = "top", row_name = "",
               col_name = glue::glue("Proporção de homicídios por arma de fogo, por UF {min(year)}–{max(year)}") ) |> 
   #Exportando tabela.
-  rio::export(x= _ ,"base/prop_homicidio_PAF_uf_br.xlsx")
+  rio::export(x= _ ,"base/paf/base/prop_homicidio_PAF_uf_br.xlsx")
 
 rm(base, sim_doext)
 
@@ -2942,7 +2943,8 @@ library(janitor)
 here::i_am("Rotinas/Tabelas Padrão - Atlas 2026.R") 
 #Importação base de interesse
 load(paste0(dirname(getwd()),"/bases/sim/RData/sim_doext_14_24.Rdata"))
-year <- c(2014:2024)
+#Últimos dez anos
+year <- seq(as.integer(format(Sys.Date(), "%Y")) - 12, as.integer(format(Sys.Date(), "%Y")) - 2);gc()
 
 
 #Contagem de sinistros no transporte terrestre
@@ -3051,7 +3053,7 @@ base |> select(ano,def_uf_resd,acid_terres) |>
   adorn_title(placement = "top", row_name = "",
               col_name = glue::glue("Mortes no transporte terrestre, por UF {min(year)}–{max(year)}") ) |> 
   #Exportando tabela.
-  rio::export(x = _ ,"base/n_transp_terres_uf_resd.xlsx")
+  rio::export(x = _ ,"base/sinistro/base/n_transp_terres_uf_resd.xlsx")
 
 
              #Figura Número de Mortes no transporte terrestre#
@@ -3083,13 +3085,11 @@ base |>
         axis.title.x=element_text(size=8),axis.title.y=element_text(size=8) ) +
   
   labs(x = "Ano", y = "Número de mortes no transporte terrestre")
-ggsave(filename ="Figuras/n_acid_terres.bmp",width = 8,height = 5,device='bmp', dpi=150)
+ggsave(filename ="base/sinistro/figuras/n_acid_terres.bmp",width = 8,height = 5,device='bmp', dpi=150)
 
 
 
-
-
-#Tabela formato wide da taxa de homicídios por Arma de fogo.
+#Tabela formato wide da taxa de acidente de transporte terrestre.
 base |> select(ano, def_uf_resd, tx_acid_terres) |>
   
   pivot_wider(names_from = ano, values_from = tx_acid_terres, values_fill = 0) %>%
@@ -3124,7 +3124,7 @@ base |> select(ano, def_uf_resd, tx_acid_terres) |>
   adorn_title(placement = "top", row_name = "",
               col_name = glue::glue("Taxa de acidentes no transporte terrestre, por UF {min(year)}–{max(year)}") ) |>
   #Exportando tabela.
-  rio::export(x= _ ,"base/taxa_transp_terres_uf_br.xlsx")
+  rio::export(x= _ ,"base/sinistro/base/tx_transp_terres_uf_br.xlsx")
 
 
            #Figura Taxa de mortes no transporte terrestre#
@@ -3188,7 +3188,8 @@ library(janitor)
 here::i_am("Rotinas/Tabelas Padrão - Atlas 2026.R") 
 #Importação base de interesse
 load(paste0(dirname(getwd()),"/bases/sim/RData/sim_doext_14_24.Rdata"))
-year <- c(2014:2024)
+#Últimos dez anos
+year <- seq(as.integer(format(Sys.Date(), "%Y")) - 12, as.integer(format(Sys.Date(), "%Y")) - 2);gc()
 
 sim_doext |>
   #V20-V29 Motociclista traumatizado em um acidente de transporte
@@ -3279,7 +3280,7 @@ base |> select(ano,def_uf_resd,acid_moto) |>
   adorn_title(placement = "top", row_name = "",
               col_name = glue::glue("Número de acidentes de motocicleta, por UF {min(year)}–{max(year)}") ) |>
   #Exportando tabela.
-  rio::export(x = _ ,"base/n_acid_moto_uf_resd.xlsx")
+  rio::export(x = _ ,"base/sinistro/base/n_acid_moto_uf_resd.xlsx")
 
 
 #Tabela Atlas. Taxa de sinistros de moto
@@ -3316,7 +3317,7 @@ base |> select(ano,def_uf_resd,tx_acid_moto) |>
   adorn_title(placement = "top", row_name = "",
               col_name = glue::glue("Taxa de acidentes de motocicleta, por UF {min(year)}–{max(year)}") ) |>
   #Exportando tabela.
-  rio::export(x = _ ,"base/tx_acid_moto_uf_resd.xlsx")
+  rio::export(x = _ ,"base/sinistro/base/tx_acid_moto_uf_resd.xlsx")
 
 
 
@@ -3328,7 +3329,19 @@ library(janitor)
 here::i_am("Rotinas/Tabelas Padrão - Atlas 2026.R") 
 #Importação base de interesse
 load(paste0(dirname(getwd()),"/bases/sim/RData/sim_doext_14_24.Rdata"))
-year <- c(2014:2024)
+#Últimos dez anos
+year <- seq(as.integer(format(Sys.Date(), "%Y")) - 12, as.integer(format(Sys.Date(), "%Y")) - 2);gc()
+
+
+
+PAREI AQUI!!!!
+  
+  
+  BASTA o ÙLTIMO ANO!!!
+
+
+
+
 
 
 #Contagem de sinistros no transporte terrestre
@@ -3413,7 +3426,7 @@ base |>
   labs(x = "", y = "")
 
 
-ggsave(filename ="Figuras/p_acid_moto.bmp",width = 11,height = 8,device='bmp', dpi=150)
+ggsave(filename ="base/sinistro/figuras/p_acid_moto.bmp",width = 11,height = 8,device='bmp', dpi=150)
 
 
 
