@@ -7,7 +7,7 @@ library(janitor)
 load(paste0(dirname(getwd()),"/bases/homic_oculto/homic_preds_96_23.RData"))
 homic_preds_96_23 <- homic_preds
 #Mantém somente data frame dos homic_preds
-rm(list = setdiff(ls(),"homic_preds_96_23"))
+rm(list = setdiff(ls(),"homic_preds_96_23"));gc()
 
 
 #Eu alterei o nome das variáveis com label, adicionei o prefixo (def_).
