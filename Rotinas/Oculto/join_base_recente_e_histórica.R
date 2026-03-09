@@ -4,7 +4,7 @@ library(janitor)
 
 #Join da base recente de homicídios ocultos com a última base
 #Base com homicídios ocultos utilizada no atlas
-load(paste0(dirname(getwd()),"/bases/homic_oculto/homic_preds_96_23.RData"))
+load(paste0(dirname(getwd()),"/bases/homic_oculto/sim_doext_homic_pred_96_23.RData"))
 homic_preds_96_23 <- homic_preds
 #Mantém somente data frame dos homic_preds
 rm(list = setdiff(ls(),"homic_preds_96_23"));gc()
@@ -32,9 +32,11 @@ homic_preds |>
   #Mantém último ano
   filter(ano == 2024) |>
   #Join com base histórica de homicídios ocultos.
-  bind_rows(homic_preds_96_23) |>
+  bind_rows(homic_preds_96_23) |> 
   #Exclusão de variáveis não utilizadas quando estimei a base new. O ideal é considerar todas as variáveis.
-  select(!c(dtobito,causabas,causa_letra,causa_num,reg_ocor,reg_resd) ) -> homic_preds 
+  select(!c(
+    intencao, intencao_homic,
+    dtobito,causabas,causa_letra,causa_num,reg_ocor,reg_resd) ) -> homic_preds 
 rm(homic_preds_96_23); gc()
 
 
@@ -99,10 +101,15 @@ homic_preds <-
 load("G:/gab_lins/Projetos/bases/sim/RData/sim_doext_14_24.RData")
 
 #Salvando base com todos os períodos
-save.image(paste0(dirname(getwd()),"/bases/homic_oculto/sim_doext_homic_pred_96_24.RData") )
+save.image(paste0(dirname(getwd()),"/bases/homic_oculto/sim_doext_homic_pred_96_24.RData") ); gc()
+
+
 
 homic_preds |>
-  count(ano,.pred_class) |> view()
+  
+  filter(.pred_class == "homic" & ano %in% c(2013:2023)) |>
+  
+  count(ano) 
 
 
 
