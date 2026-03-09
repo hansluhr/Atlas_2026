@@ -1,13 +1,13 @@
 # Homicídio Oculto e projetado, por UF e Brasil--------------------------------------------------------
 library(tidyverse)
 library(janitor)
-library(glue)
 
-#Importação da base de homicídios ocultos e homicídios registrados.
-load("C:/Users/gabli/Desktop/r/SIM/Atlas 2025/sim_doext_homic_pred_96_23.RData")
-#Período analisado.
-year <- c(2013:2023)
-ano <- paste(min(year), max(year), sep = "-")
+#Pasta Raiz
+here::i_am("Rotinas/Oculto/Tabelas Padrão Ocultos - Atlas  2026.R")
+#Importação base de interesse
+load(paste0(dirname(getwd()),"/bases/homic_oculto/sim_doext_homic_pred_96_24.Rdata"))
+year <- seq(as.integer(format(Sys.Date(), "%Y")) - 12, as.integer(format(Sys.Date(), "%Y")) - 2);gc()
+#ano <- paste(min(year), max(year), sep = "-")
 
 #Contagem de homicídios registrados, por ano e UF
 sim_doext |> 
@@ -35,7 +35,7 @@ rm(homic,ocult)
 
 ##Importando população.
 #Caminho do excel com pnadc
-excel_pnadc <- "D:/Dropbox/Ipea/Atlas/Pop_Geral_UFs_PNADc.xlsx"
+excel_pnadc <- paste0(dirname(getwd()),"/bases/populacao/Pop_Geral_UFs_PNADc.xlsx") 
 
 #Importação e empilhando os últimos dez anos da PNADc
 pop_pnadc <- map_dfr(
@@ -110,7 +110,7 @@ base |> select(ano,uf_resd,oculto = ppb2_homicidio) |>
   mutate(across(where(is.numeric), ~ str_replace_all(as.character(.), "\\.", ","))) %>%
   #Necessário para colocar o título
   as_tibble() |>
-  adorn_title(placement = "top", col_name = glue::glue("Número de homicídios ocultos, por UF – Brasil {ano}") ) |>
+  adorn_title(placement = "top", col_name = glue::glue("Número de homicídios ocultos, por UF {min(year)}–{max(year)}") ) |>
   #Exportando tabela.
   rio::export(x= _ ,"n_homicidio_oculto_uf_br.xlsx")
 
