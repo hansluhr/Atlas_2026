@@ -196,3 +196,290 @@ sinan |>
   tabyl(fxet_eca,t_viol) %>% adorn_totals(where = c("row","col")) %>%
   adorn_percentages(denominator  = "col") %>% adorn_pct_formatting(digits = 1) %>%
   adorn_ns(position = "front")
+
+
+
+# Gráfico - Notificações no mesmo município, estabelecimento e geral 0 a 4 anos --------
+library(tidyverse)
+library(janitor)
+here::i_am("Rotinas//eca/eca_atlas_2026_sinan_transtorno.R")
+#Carrgando base SINAN Violência
+load(paste0(dirname(getwd()),"/bases/sinan_violencia/sinan_14_24_transtorno.Rdata") ); gc()
+#Primeiro ano do perído disponível
+year <- sinan |>
+  mutate(ano_not = ano_not |> as.character() |> as.integer() ) |>
+  summarise(ano_min = min(ano_not, na.rm = TRUE) ) |> pull()
+
+###Geral
+sinan |> 
+  #Filtro categorias desejadas.
+  dplyr::filter(grupo_viol!="Autoprovocada" & idade %in% c(0:4) ) |> 
+  count(ano_not, name = "n_geral") -> geral
+
+###Mesmo estabelecimento
+sinan |> 
+  #Filtro categorias desejadas.
+  dplyr::filter(grupo_viol!="Autoprovocada" & idade %in% c(0:4) ) |> 
+  # Mantém apenas unidades que aparecem em 2013 (mesmo que em outros anos)
+  dplyr::filter(id_unidade %in% unique(id_unidade[ano_not == year])) |> 
+  summarise(n_estab = n(), .by = (ano_not) ) -> estab
+
+
+###Mesmo Município
+sinan |> 
+  #Filtro categorias desejadas.
+  dplyr::filter(grupo_viol!="Autoprovocada" & idade %in% c(0:4) ) |> 
+  #Mantém apenas municípios que aparecem em 2013 
+  dplyr::filter(id_municip %in% unique(id_municip[ano_not == year])) |> 
+  summarise(n_munic = n(), .by = (ano_not) ) -> munic
+
+#Jutando as bases
+geral |>
+  reduce(
+    .x = list(munic,estab),
+    .f = ~ left_join(.x, .y, by = "ano_not"),
+    .init = _ ) |>
+  mutate(
+    across(
+      c(n_geral, n_munic, n_estab),
+      ~ round( (.x / .x[ano_not == year]) * 100, 1),  # Divide pelo valor de 2013 e multiplica por 100
+      .names = "{.col}_base100"  # Sufixo para as novas colunas
+    ) ) -> base
+
+#Elimina bases não utilizadas
+rm(estab,geral,munic); gc()
+
+#Gráficio
+base |>
+  #Mantém variáveis de interesse
+  select(!c(n_geral, n_munic, n_estab) ) |>
+  
+  rename(Geral = n_geral_base100,
+         "Município" = n_munic_base100,
+         "Estabelecimento" = n_estab_base100) |>
+  
+  #Pivot para o gráfico
+  pivot_longer(cols = !c(ano_not), names_to = "unidade", values_to = "n" ) |>
+  #Transforma ano_not em date. Será utilizado no eixo
+  mutate(ano_not = ano_not |> fct_drop() |> as.character() |> as.numeric(),
+         ano_not = make_date(ano_not) )  |>
+  #Gráfico
+  ggplot() +
+  
+  geom_line(aes(x = ano_not, y = n, group = unidade, color = unidade) ) + 
+  geom_point(aes(x = ano_not, y = n, color = unidade) ) +
+  #Texto
+  ggrepel::geom_text_repel(aes(x = ano_not, y = n, color = unidade, 
+                               label = scales::number(n, big.mark = ".", decimal.mark = ",") ),
+                           show.legend = FALSE) +
+  scale_x_date(breaks = scales::breaks_width("1 year"), labels = scales::label_date("'%y") ) +
+  
+  guides(color = guide_legend(position = "inside", nrow = 1)) +
+  
+  theme(legend.title=element_blank(),
+        plot.title = element_text(size=10, face = "bold"),
+        legend.position.inside = c(0.2,0.8),
+        axis.text.x=element_text(size=8.5),axis.text.y=element_text(size=8.5),
+        axis.title.x=element_text(size=7.25),axis.title.y=element_text(size=7.25),
+        legend.text = element_text(size = 10,face="bold"), 
+        legend.key = element_rect(fill = "transparent", colour = NA),
+        legend.background = element_rect(fill = "transparent", colour = NA) ) +
+  labs(x = "Ano da notificação", y = "Notificações", title = "Infante - 0 à 4 anos")
+
+
+ggsave(filename ="base/eca/figura/base100_infantes0a4.bmp",width = 15,height = 9,device='bmp', dpi=180)
+ggsave(filename ="base/eca/figura/base100_infantes0a4.eps",width = 15,height = 9,device=cairo_ps, dpi=180)
+
+rm(base)
+
+
+# Gráfico - Notificações no mesmo município, estabelecimento e geral 5 a 14 anos --------
+library(tidyverse)
+library(janitor)
+here::i_am("Rotinas/eca/eca_atlas_2026_sinan_transtorno.R")
+#Carrgando base SINAN Violência
+load(paste0(dirname(getwd()),"/bases/sinan_violencia/sinan_14_24_transtorno.Rdata") ); gc()
+#Primeiro ano do perído disponível
+year <- sinan |>
+  mutate(ano_not = ano_not |> as.character() |> as.integer() ) |>
+  summarise(ano_min = min(ano_not, na.rm = TRUE) ) |> pull()
+
+##Notificações na idade de interesse
+sinan |> 
+  #Filtro categorias desejadas.
+  dplyr::filter(grupo_viol!="Autoprovocada" & idade %in% c(5:14) ) |> 
+  count(ano_not, name = "n_geral") -> geral
+
+###Notificações nos estabelecimentos com notificações no primeiro período disponível na base.
+sinan |> 
+  #Filtro categorias desejadas.
+  dplyr::filter(grupo_viol!="Autoprovocada" & idade %in% c(5:14) ) |> 
+  # Mantém apenas unidades que aparecem em 2013 (mesmo que em outros anos)
+  dplyr::filter(id_unidade %in% unique(id_unidade[ano_not == year])) |> 
+  summarise(n_estab = n(), .by = (ano_not) ) -> estab
+
+
+###Notificações nos municípios com notificações no primeiro período disponível na base
+sinan |> 
+  #Filtro categorias desejadas.
+  dplyr::filter(grupo_viol!="Autoprovocada" & idade %in% c(5:14) ) |> 
+  #Mantém apenas municípios que aparecem em 2013 
+  dplyr::filter(id_municip %in% unique(id_municip[ano_not == year])) |> 
+  summarise(n_munic = n(), .by = (ano_not) ) -> munic
+
+#Jutando as bases
+geral |>
+  reduce(
+    .x = list(munic,estab),
+    .f = ~ left_join(.x, .y, by = "ano_not"),
+    .init = _ ) |>
+  mutate(
+    across(
+      c(n_geral, n_munic, n_estab),
+      ~ round( (.x / .x[ano_not == year]) * 100, 1),  # Divide pelo valor de 2013 e multiplica por 100
+      .names = "{.col}_base100"  # Sufixo para as novas colunas
+    ) ) -> base
+
+#Elimina bases não utilizadas
+rm(estab,geral,munic)
+gc()
+
+#Gráficio
+base |>
+  #Mantém variáveis de interesse
+  select(!c(n_geral, n_munic, n_estab) ) |>
+  
+  rename(Geral = n_geral_base100,
+         "Município" = n_munic_base100,
+         "Estabelecimento" = n_estab_base100) |>
+  
+  #Pivot para o gráfico
+  pivot_longer(cols = !c(ano_not), names_to = "unidade", values_to = "n" ) |>
+  #Transforma ano_not em date. Será utilizado no eixo
+  mutate(ano_not = ano_not |> fct_drop() |> as.character() |> as.numeric(),
+         ano_not = make_date(ano_not) )  |>
+  #Gráfico
+  ggplot() +
+  
+  geom_line(aes(x = ano_not, y = n, group = unidade, color = unidade) ) + 
+  geom_point(aes(x = ano_not, y = n, color = unidade) ) +
+  #Texto
+  ggrepel::geom_text_repel(aes(x = ano_not, y = n, color = unidade, 
+                               label = scales::number(n, big.mark = ".", decimal.mark = ",") ),
+                           show.legend = FALSE) +
+  scale_x_date(breaks = scales::breaks_width("1 year"), labels = scales::label_date("'%y") ) +
+  
+  guides(color = guide_legend(position = "inside", nrow = 1)) +
+  
+  theme(legend.title=element_blank(), 
+        plot.title = element_text(size=10, face = "bold"),
+        legend.position.inside = c(0.2,0.8),
+        axis.text.x=element_text(size=8.5),axis.text.y=element_text(size=8.5),
+        axis.title.x=element_text(size=7.25),axis.title.y=element_text(size=7.25),
+        legend.text = element_text(size = 10,face="bold"), 
+        legend.key = element_rect(fill = "transparent", colour = NA),
+        legend.background = element_rect(fill = "transparent", colour = NA) ) +
+  labs(x = "Ano da notificação", y = "Notificações", title = "Crianças - 5 à 14 anos")
+
+
+ggsave(filename ="base/eca/figura/base100_crianças5a14.bmp",width = 15,height = 9,device='bmp', dpi=180)
+ggsave(filename ="base/eca/figura/base100_crianças5a14.eps",width = 15,height = 9,device=cairo_ps, dpi=180)
+
+
+rm(base)
+
+
+
+# Gráfico - Notificações no mesmo município, estabelecimento e geral 15 a 19 anos --------
+library(tidyverse)
+library(janitor)
+here::i_am("Rotinas//eca/eca_atlas_2026_sinan_transtorno.R")
+#Carrgando base SINAN Violência
+load(paste0(dirname(getwd()),"/bases/sinan_violencia/sinan_14_24_transtorno.Rdata") ); gc()
+#Primeiro ano do perído disponível
+year <- sinan |>
+  mutate(ano_not = ano_not |> as.character() |> as.integer() ) |>
+  summarise(ano_min = min(ano_not, na.rm = TRUE) ) |> pull()
+
+###Notificações na idade de interesse
+sinan |> 
+  #Filtro categorias desejadas.
+  dplyr::filter(grupo_viol!="Autoprovocada" & idade %in% c(15:29) ) |> 
+  count(ano_not, name = "n_geral") -> geral
+
+###Notificações nos estabelecimentos com notificações no primeiro período disponível na base.
+sinan |> 
+  #Filtro categorias desejadas.
+  dplyr::filter(grupo_viol!="Autoprovocada" & idade %in% c(15:29) ) |> 
+  #Unidades que aparecem no primeiro ano disponível na base
+  dplyr::filter(id_unidade %in% unique(id_unidade[ano_not == year])) |> 
+  summarise(n_estab = n(), .by = (ano_not) ) -> estab
+
+
+###Notificações nos municípios com notificações no primeiro período disponível na base
+sinan |> 
+  #Filtro categorias desejadas.
+  dplyr::filter(grupo_viol!="Autoprovocada" & idade %in% c(15:29) ) |> 
+  #Municípios que aparecem no primeiro ano disponível na base
+  dplyr::filter(id_municip %in% unique(id_municip[ano_not == year])) |> 
+  summarise(n_munic = n(), .by = (ano_not) ) -> munic
+
+#Jutando as bases
+geral |>
+  reduce(
+    .x = list(munic,estab),
+    .f = ~ left_join(.x, .y, by = "ano_not"),
+    .init = _ ) |>
+  mutate(
+    across(
+      c(n_geral, n_munic, n_estab),
+      ~ round( (.x / .x[ano_not == year]) * 100, 1),  #Divide pelo valor do primeiro período e multiplica por 100
+      .names = "{.col}_base100"  #Identifica base 100
+    ) ) -> base
+
+#Elimina bases não utilizadas
+rm(estab,geral,munic)
+gc()
+
+#Gráficio
+base |>
+  #Mantém variáveis de interesse
+  select(!c(n_geral, n_munic, n_estab) ) |>
+  
+  rename(Geral = n_geral_base100,
+         "Município" = n_munic_base100,
+         "Estabelecimento" = n_estab_base100) |>
+  
+  #Pivot para o gráfico
+  pivot_longer(cols = !c(ano_not), names_to = "unidade", values_to = "n" ) |>
+  #Transforma ano_not em date. Será utilizado no eixo
+  mutate(ano_not = ano_not |> fct_drop() |> as.character() |> as.numeric(),
+         ano_not = make_date(ano_not) )  |>
+  #Gráfico
+  ggplot() +
+  
+  geom_line(aes(x = ano_not, y = n, group = unidade, color = unidade) ) + 
+  geom_point(aes(x = ano_not, y = n, color = unidade) ) +
+  #Texto
+  ggrepel::geom_text_repel(aes(x = ano_not, y = n, color = unidade, 
+                               label = scales::number(n, big.mark = ".", decimal.mark = ",") ),
+                           show.legend = FALSE) +
+  scale_x_date(breaks = scales::breaks_width("1 year"), labels = scales::label_date("'%y") ) +
+  
+  guides(color = guide_legend(position = "inside", nrow = 1)) +
+  
+  theme(legend.title=element_blank(), 
+        plot.title = element_text(size=10, face = "bold"),
+        legend.position.inside = c(0.2,0.8),
+        axis.text.x=element_text(size=8.5),axis.text.y=element_text(size=8.5),
+        axis.title.x=element_text(size=7.25),axis.title.y=element_text(size=7.25),
+        legend.text = element_text(size = 10, face="bold"), 
+        legend.key = element_rect(fill = "transparent", colour = NA),
+        legend.background = element_rect(fill = "transparent", colour = NA) ) +
+  labs(x = "Ano da notificação", y = "Notificações", title = "Jovens - 15 à 29 anos")
+ggsave(filename ="base/eca/figura/base100_jovens.bmp",width = 15,height = 9,device='bmp', dpi=180)
+ggsave(filename ="base/eca/figura/base100_jovens.eps",width = 15,height = 9,device=cairo_ps, dpi=180)
+
+rm(base)
+
+
