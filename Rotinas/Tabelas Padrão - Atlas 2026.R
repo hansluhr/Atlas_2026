@@ -3329,17 +3329,10 @@ library(janitor)
 here::i_am("Rotinas/Tabelas Padrão - Atlas 2026.R") 
 #Importação base de interesse
 load(paste0(dirname(getwd()),"/bases/sim/RData/sim_doext_14_24.Rdata"))
-#Últimos dez anos
-year <- seq(as.integer(format(Sys.Date(), "%Y")) - 12, as.integer(format(Sys.Date(), "%Y")) - 2);gc()
-
-
-
-PAREI AQUI!!!!
-  
-  
-  BASTA o ÙLTIMO ANO!!!
-
-
+#Último ano da série
+year <- sim_doext |>
+  mutate(ano = ano |> as.integer()) |>
+  summarize(max_val = max(ano, na.rm = TRUE)) |> pull()
 
 
 
@@ -3399,11 +3392,10 @@ sim_doext |>
   #Proporção de acidentes de moto
   mutate(p_acid_moto = round( (n_acid_moto/n_acid_terres)*100, 1),
          ufs = case_when(def_uf_resd == "Brasil" ~ "Brasil",
-                         .default = "Outros") ) |>
-    filter(ano == 2024) -> base
+                         .default = "Outros") ) |> 
+    filter(ano == year) -> base
 
 #Gráfico da proporção de mortes por acidente de motocicleta no total de acidentes de terrestres.
-  filter(ano == 2023) -> base
 
 base |>
   
@@ -3417,27 +3409,13 @@ base |>
                 hjust = -0.3), size = 3 ) +
   
   scale_x_continuous(
-    labels = scales::label_percent(scale = 1, decimal.mark = ",", accuracy = 0.1) ) +
+     labels = scales::label_percent(scale = 1, decimal.mark = ",", accuracy = 0.1) ) +
 
   labs(x = "", y = "") + 
   
   theme(axis.text.y = element_text(face = "bold") )
-
-  labs(x = "", y = "")
-
-
 ggsave(filename ="base/sinistro/figuras/p_acid_moto.bmp",width = 11,height = 8,device='bmp', dpi=150)
+ggsave(filename ="base/eca/figura/p_acid_moto.eps",width = 11,height = 8,device=cairo_ps, dpi=150)
 
-
-
-
-
-
-ggrepel::geom_text_repel(
-
-
-
-
-# Sinistros em outros meios de transporte ---------------------------------
 
 
