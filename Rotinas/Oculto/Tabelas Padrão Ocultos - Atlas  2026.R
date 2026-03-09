@@ -7,26 +7,26 @@ here::i_am("Rotinas/Oculto/Tabelas Padrão Ocultos - Atlas  2026.R")
 #Importação base de interesse
 load(paste0(dirname(getwd()),"/bases/homic_oculto/sim_doext_homic_pred_96_24.Rdata"))
 year <- seq(as.integer(format(Sys.Date(), "%Y")) - 12, as.integer(format(Sys.Date(), "%Y")) - 2);gc()
-#ano <- paste(min(year), max(year), sep = "-")
+
 
 #Contagem de homicídios registrados, por ano e UF
 sim_doext |> 
   #Filtro das intenções de interesse.
   filter(intencao_homic  == "Homicídio" & ano %in% year) |> droplevels() |>
-  count(ano,uf_resd,intencao_homic, name = "homicidio") |>
+  count(ano,def_uf_resd,intencao_homic, name = "homicidio") |>
   #Mantém variáveis utlizadas
   select(!c(intencao_homic) ) -> homic
 
 #Contagem de homicídios ocultos, por ano e UF
 homic_preds |> 
   #Filtrando homicídios ocultos
-  filter(.pred_class == "homic" & ano %in% year) |> droplevels() |>
-  count(ano,uf_resd,.pred_class, name = "ppb2_homicidio") |> 
+  filter(.pred_class %in% c("homic","Homicídio") & ano %in% year) |> droplevels() |>
+  count(ano,def_uf_resd, .pred_class, name = "ppb2_homicidio") |> 
   #Mantém variáveis utlizadas
   select(!c(.pred_class)) -> ocult
 
 #Juntando base homicídio registrado a homicídio coulto
-base <- left_join(homic,ocult, by = c("ano","uf_resd")) |> 
+base <- left_join(homic,ocult, by = c("ano","def_uf_resd")) |> 
   #Colocando zeros em UFs sem homicídio registrado (kek) ou sem homicídio oculto   
   mutate(across(where(is.numeric),~replace_na(.,0)),
          #Homicídios projetados
@@ -49,31 +49,31 @@ pop_pnadc <- map_dfr(
 rm(excel_pnadc)
 
 #Tratamento base com população PNADc
-pop_pnadc |> rename(uf_resd = UF) |>
+pop_pnadc |> rename(def_uf_resd = UF) |>
   #Excluindo as regiões. Não utilizado
-  filter(!(uf_resd %in% c("Norte","Centro Oeste","Nordeste","Sudeste","Sul"))) |>
+  filter(!(def_uf_resd %in% c("Norte","Centro Oeste","Nordeste","Sudeste","Sul"))) |>
   #Incluindo código das UFs
-  mutate(cod_ibge = recode(uf_resd, "Rondônia" = 11,"Acre" = 12, "Amazonas" = 13, "Roraima" = 14, "Pará" = 15, "Amapá" = 16,
+  mutate(cod_ibge = recode(def_uf_resd, "Rondônia" = 11,"Acre" = 12, "Amazonas" = 13, "Roraima" = 14, "Pará" = 15, "Amapá" = 16,
                            "Maranhão" = 21, "Piauí" = 22, "Ceará" = 23, "Rio Grande do Norte" = 24, "Paraíba" = 25, 
                            "Pernambuco" = 26, "Alagoas" = 27, "Sergipe" = 28, "Bahia" = 29, "Minas Gerais" = 31,
                            "Espírito Santo" = 32, "Rio de Janeiro" = 33, "São Paulo" = 35, "Paraná" = 41, "Santa Catarina" = 42,
                            "Rio Grande do Sul" = 43, "Mato Grosso do Sul" = 50, "Mato Grosso" = 51, "Goiás" = 52,
-                           "Distrito Federal" = 53, "Tocantins" = 17), .before=uf_resd,
+                           "Distrito Federal" = 53, "Tocantins" = 17), .before=def_uf_resd,
          #Transofrmando em factor variáveis desejadas
          ano = ano |> as_factor(),
-         uf_resd = uf_resd |> as_factor() ) -> pop_pnadc
+         def_uf_resd = def_uf_resd |> as_factor() ) -> pop_pnadc
 
 #Join tabela com homicídio registrado, oculto e projetado e população PNADc - UF
-left_join(pop_pnadc,base, by = c("ano","uf_resd"))  -> base
+left_join(pop_pnadc,base, by = c("ano","def_uf_resd"))  -> base
 rm(pop_pnadc)
 
 #Acrescentando população, registrado, oculto e projetado Brasil à base trabalhada.
 base |>
-  summarise(uf_resd="Brasil" |> as.factor(),
+  summarise(def_uf_resd="Brasil" |> as.factor(),
             pop = sum(pop),
             homicidio = sum(homicidio),
             ppb2_homicidio = sum(ppb2_homicidio),
-            homicidio_proj = sum(homicidio_proj),.by=ano) |>
+            homicidio_proj = sum(homicidio_proj),.by=ano) |> 
   #Bind_row de Brasil a base com UFs.
  bind_rows(base) -> base
 
@@ -86,7 +86,7 @@ base %>%
 
 ### Tabelas no formato atlas da violência
 #Homicídio oculto - Valor absoluto
-base |> select(ano,uf_resd,oculto = ppb2_homicidio) |>
+base |> select(ano,def_uf_resd,oculto = ppb2_homicidio) |>
   
   pivot_wider(names_from = ano,values_from = oculto) %>%
   #Variações
@@ -104,18 +104,19 @@ base |> select(ano,uf_resd,oculto = ppb2_homicidio) |>
   slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
                 "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
                 "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
-                "Sergipe","Tocantins"),uf_resd) ) |>
+                "Sergipe","Tocantins"),def_uf_resd) ) |>
   # Converte as colunas numéricas para caracteres e substitui pontos por vírgulas.
   #Assim fica mais fácil converter para numérico no excel.
   mutate(across(where(is.numeric), ~ str_replace_all(as.character(.), "\\.", ","))) %>%
   #Necessário para colocar o título
   as_tibble() |>
-  adorn_title(placement = "top", col_name = glue::glue("Número de homicídios ocultos, por UF {min(year)}–{max(year)}") ) |>
+  adorn_title(placement = "top", row_name = "",
+              col_name = glue::glue("Número de homicídios ocultos, por UF {min(year)}–{max(year)}") ) |>
   #Exportando tabela.
-  rio::export(x= _ ,"n_homicidio_oculto_uf_br.xlsx")
+  rio::export(x= _ ,"base/oculto/base/n_homicidio_oculto_uf_br.xlsx")
 
 #Taxa de Homicídio oculto 
-base |> select(ano,uf_resd,tx_oculto) |>
+base |> select(ano,def_uf_resd,tx_oculto) |>
   
   pivot_wider(names_from = ano,values_from = tx_oculto) %>%
   
@@ -134,18 +135,19 @@ base |> select(ano,uf_resd,tx_oculto) |>
   slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
                 "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
                 "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
-                "Sergipe","Tocantins"),uf_resd) ) |>
+                "Sergipe","Tocantins"),def_uf_resd) ) |>
   # Converte as colunas numéricas para caracteres e substitui pontos por vírgulas.
   #Assim fica mais fácil converter para numérico no excel.
   mutate(across(where(is.numeric), ~ str_replace_all(as.character(.), "\\.", ","))) %>%
   #Necessário para colocar o título
   as_tibble() |>
-  adorn_title(placement = "top",col_name = glue::glue("Taxa de homicídios ocultos, por UF – Brasil {ano}") ) %>% 
-  rio::export(.,"taxa_homicidio_oculto_uf_br.xlsx")
+  adorn_title(placement = "top", row_name = "",
+              col_name = glue::glue("Taxa de homicídios ocultos, por UF {min(year)}–{max(year)}") ) %>% 
+  rio::export(.,"base/oculto/base/tx_homicidio_oculto_uf_br.xlsx")
 
 
 #Homicídio estimado - Valor absoluto
-base |> select(ano,uf_resd,homicidio_proj) |>
+base |> select(ano,def_uf_resd,homicidio_proj) |>
   
   pivot_wider(names_from = ano,values_from = homicidio_proj) %>%
   
@@ -164,17 +166,18 @@ base |> select(ano,uf_resd,homicidio_proj) |>
   slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
                 "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
                 "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
-                "Sergipe","Tocantins"),uf_resd) ) |>
+                "Sergipe","Tocantins"),def_uf_resd) ) |>
   # Converte as colunas numéricas para caracteres e substitui pontos por vírgulas.
   #Assim fica mais fácil converter para numérico no excel.
   mutate(across(where(is.numeric), ~ str_replace_all(as.character(.), "\\.", ","))) %>%
   #Necessário para colocar o título
   as_tibble() |>
-  adorn_title(placement = "top",col_name = glue("Número de homicídios projetados, por UF – Brasil {ano}") ) %>% 
-  rio::export(.,"n_homicidio_estimados_uf_br.xlsx")
+  adorn_title(placement = "top", row_name = "",
+              col_name = glue::glue("Número de homicídios projetados,  por UF {min(year)}–{max(year)}") ) %>% 
+  rio::export(.,"base/oculto/base/n_homicidio_estimados_uf_br.xlsx")
 
 #Taxa de homicídio estimado
-base |> select(ano,uf_resd,tx_homicidio_proj) |>
+base |> select(ano,def_uf_resd,tx_homicidio_proj) |>
   
   pivot_wider(names_from = ano,values_from = tx_homicidio_proj) %>%
   #Variações
@@ -192,43 +195,45 @@ base |> select(ano,uf_resd,tx_homicidio_proj) |>
   slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
                 "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
                 "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
-                "Sergipe","Tocantins"),uf_resd) ) |>
+                "Sergipe","Tocantins"),def_uf_resd) ) |>
   # Converte as colunas numéricas para caracteres e substitui pontos por vírgulas.
   #Assim fica mais fácil converter para numérico no excel.
   mutate(across(where(is.numeric), ~ str_replace_all(as.character(.), "\\.", ","))) %>%
-  #Necessário para colocar o título
-  as_tibble() |>
-  adorn_title(placement = "top",col_name = glue("Taxa de homicídios projetados, por UF – Brasil {ano}") ) %>% 
+  adorn_title(placement = "top",row_name = "",
+              col_name = glue::glue("Taxa de homicídios projetados, por UF {min(year)}–{max(year)}") ) %>% 
   
-  rio::export(.,"taxa_homicidio_estimado_uf_br.xlsx")
+  rio::export(.,"base/oculto/base/tx_homicidio_estimado_uf_br.xlsx")
 
-rm(base,homic_preds,sim_doext,ano,year)
+rm(base,homic_preds,sim_doext,year)
 
 
 # Homicídio projetado jovens 15 a 29 anos. --------------------------------
 library(tidyverse)
 library(janitor)
-library(glue)
-#Importação da base de homicídios ocultos e homicídios registrados.
-load("C:/Users/gabli/Desktop/r/SIM/Atlas 2025/sim_doext_homic_pred_96_23.RData")
-#Período analisado.
-year <- c(2013:2023)
-ano <- paste(min(year), max(year), sep = "-")
+#Pasta Raiz
+here::i_am("Rotinas/Oculto/Tabelas Padrão Ocultos - Atlas  2026.R")
+#Importação base de interesse
+load(paste0(dirname(getwd()),"/bases/homic_oculto/sim_doext_homic_pred_96_24.Rdata"))
+year <- seq(as.integer(format(Sys.Date(), "%Y")) - 12, as.integer(format(Sys.Date(), "%Y")) - 2);gc()
+
 
 #Contagem de homicídios registrados de jovens, por ano e UF
 sim_doext |> 
   #Filtro das intenções de interesse.
   filter(intencao_homic  == "Homicídio" & idade %in% c(15:29) & ano %in% year) |> droplevels() |>
-  count(ano,cod_uf_resd,uf_resd, name = "homicidio") -> homic
+  count(ano,cod_uf_resd,def_uf_resd, name = "homicidio") |>
+  #Sim duckdb
+  mutate(cod_uf_resd = cod_uf_resd |> as.integer() ) -> homic
+
 
 #Contagem de homicídios ocultos, por ano e UF
 homic_preds |> 
   #Filtrando homicídios ocultos
-  filter(.pred_class == "homic" & idade %in% c(15:29) & ano %in% year) |> droplevels() |>
-  count(ano,uf_resd, name = "ppb2_homicidio")  -> ocult
+  filter(.pred_class %in% c("homic","Homicídio") & idade %in% c(15:29) & ano %in% year) |> droplevels() |>
+  count(ano,def_uf_resd, name = "ppb2_homicidio") -> ocult
 
 #Juntando base homicídio registrado a homicídio coulto
-base <- left_join(homic,ocult, by = c("ano","uf_resd")) |> 
+base <- left_join(homic,ocult, by = c("ano","def_uf_resd")) |> 
   #Colocando zeros em UFs sem homicídio registrado (kek) ou sem homicídio oculto   
   mutate(across(where(is.numeric),~replace_na(.,0)),
          #Homicídios projetados
@@ -237,7 +242,7 @@ rm(homic,ocult)
 
 ##Importando população.
 #Caminho do excel com pnadc
-excel_pnadc <- "C:/Users/gabli/Dropbox/Ipea/Atlas/Pop_Jovens_UFs_PNADc.xlsx"
+excel_pnadc <- paste0(dirname(getwd()),"/bases/populacao/Pop_Jovens_UFs_PNADc.xlsx")
 
 #Importação e empilhando os últimos dez anos da PNADc
 pop_pnadc <- map_dfr(
@@ -266,7 +271,7 @@ pop_pnadc |> rename(uf = UF) |>
          uf = uf |> as_factor() ) -> pop_pnadc
 
 #Join homicídios e população.  
-left_join(x = base, y = pop_pnadc, by = join_by("ano","cod_uf_resd" == "cod_ibge","uf_resd" == "uf") ) |>
+left_join(x = base, y = pop_pnadc, by = join_by("ano","cod_uf_resd" == "cod_ibge","def_uf_resd" == "uf") ) |>
   #O código da UF não é mais necessário
   select(!c(cod_uf_resd) ) -> base
 rm(pop_pnadc)
@@ -274,7 +279,7 @@ rm(pop_pnadc)
 #Acrescentando total Brasil e criando taxas
 base %>%
   bind_rows(. |>
-              summarise(uf_resd="Brasil" |> as.factor(),
+              summarise(def_uf_resd="Brasil" |> as.factor(),
                         Pop = sum(Pop),
                         homicidio = sum(homicidio),
                         ppb2_homicidio = sum(ppb2_homicidio),
@@ -285,7 +290,7 @@ base %>%
 
 ### Tabelas no formato atlas da violência
 #Homicídio Projetado jovem - Valor absoluto
-base |> select(ano,uf_resd,homicidio_proj) |>
+base |> select(ano,def_uf_resd,homicidio_proj) |>
     pivot_wider(names_from = ano,values_from = homicidio_proj) %>%
     #Variações
   mutate(
@@ -302,18 +307,19 @@ base |> select(ano,uf_resd,homicidio_proj) |>
   slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
                 "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
                 "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
-                "Sergipe","Tocantins"),uf_resd) ) |>
+                "Sergipe","Tocantins"),def_uf_resd) ) |>
   # Converte as colunas numéricas para caracteres e substitui pontos por vírgulas.
   #Assim fica mais fácil converter para numérico no excel.
   mutate(across(where(is.numeric), ~ str_replace_all(as.character(.), "\\.", ","))) %>%
   #Necessário para colocar o título
   as_tibble() |>
-  adorn_title(placement = "top",col_name = glue("Número de homicídios estimados de jovens de 15 a 29 anos, por UF – Brasil {ano}") ) %>% 
+  adorn_title(placement = "top", row_name = "",
+              col_name = glue::glue("Número de homicídios estimados de jovens de 15 a 29 anos, por UF {min(year)}–{max(year)}") ) %>% 
   
-  rio::export(.,"n_homicidio_jovem_estimado_uf_br.xlsx")
+  rio::export(.,"base/eca/oculto/n_homicidio_jovem_estimado_uf_br.xlsx")
 
 #Taxa de homicídio estimado de jovens
-base |> select(ano,uf_resd,tx_homicidio_proj) |>
+base |> select(ano,def_uf_resd,tx_homicidio_proj) |>
   pivot_wider(names_from = ano,values_from = tx_homicidio_proj) %>%
   #Variações
   mutate(
@@ -330,40 +336,43 @@ base |> select(ano,uf_resd,tx_homicidio_proj) |>
   slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
                 "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
                 "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
-                "Sergipe","Tocantins"),uf_resd) ) |>
+                "Sergipe","Tocantins"),def_uf_resd) ) |>
   # Converte as colunas numéricas para caracteres e substitui pontos por vírgulas.
   #Assim fica mais fácil converter para numérico no excel.
   mutate(across(where(is.numeric), ~ str_replace_all(as.character(.), "\\.", ","))) %>%
   #Necessário para colocar o título
   as_tibble() |>
-  adorn_title(placement = "top",col_name = glue("Taxa de homicídios projetados, por UF – Brasil {ano}") ) %>% 
-  rio::export(.,"taxa_homicidio_jovem_projetado_uf_br.xlsx")
-rm(list = ls())
+  adorn_title(placement = "top", row_name = "",
+              col_name = glue::glue("Taxa de homicídios projetados, por UF {min(year)}–{max(year)}") ) %>% 
+  rio::export(.,"base/eca/oculto/tx_homicidio_jovem_projetado_uf_br.xlsx")
+rm(list = ls()); gc()
 
 # Homicídio estimado mulher ----------------------------------------------
 library(tidyverse)
 library(janitor)
-library(glue)
-#Importação da base de homicídios ocultos e homicídios registrados.
-load("C:/Users/gabli/Desktop/r/SIM/Atlas 2025/sim_doext_homic_pred_96_23.RData")
-#Período analisado.
-year <- c(2013:2023)
-ano <- paste(min(year), max(year), sep = "-")
+#Pasta Raiz
+here::i_am("Rotinas/Oculto/Tabelas Padrão Ocultos - Atlas  2026.R")
+#Importação base de interesse
+load(paste0(dirname(getwd()),"/bases/homic_oculto/sim_doext_homic_pred_96_24.Rdata"))
+year <- seq(as.integer(format(Sys.Date(), "%Y")) - 12, as.integer(format(Sys.Date(), "%Y")) - 2);gc()
+
 
 #Contagem de homicídios registrados de mulheres, por ano e UF
 sim_doext |> 
   #Filtro das intenções de interesse.
-  filter(intencao_homic  == "Homicídio" & sexo == "Mulher" & ano %in% year) |> droplevels() |>
-  count(ano,uf_resd, cod_uf_resd, name = "homicidio")  -> homic
+  filter(intencao_homic  == "Homicídio" & def_sexo == "Mulher" & ano %in% year) |> droplevels() |>
+  count(ano,def_uf_resd, cod_uf_resd, name = "homicidio") |>
+  #Sim duckdb
+  mutate(cod_uf_resd = cod_uf_resd |> as.integer() ) -> homic
 
 #Contagem de homicídios ocultos mulheres, por ano e UF
 homic_preds |> 
   #Filtrando homicídios ocultos
-  filter(.pred_class == "homic" & sexo == "Mulher" & ano %in% year) |> droplevels() |>
-  count(ano,uf_resd, cod_uf_resd, name = "ppb2_homicidio") -> ocult
+  filter(.pred_class %in% c("homic","Homicídio") & def_sexo == "Mulher" & ano %in% year) |> droplevels() |>
+  count(ano,def_uf_resd, name = "ppb2_homicidio") -> ocult
 
 #Juntando base homicídio registrado a homicídio oculto
-base <- left_join(homic,ocult, by = c("ano","uf_resd","cod_uf_resd")) |> 
+base <- left_join(homic,ocult, by = c("ano","def_uf_resd") ) |> 
   #Colocando zeros em UFs sem homicídio registrado (kek) ou sem homicídio oculto   
   mutate(across(where(is.numeric),~replace_na(.,0)),
          #Homicídios projetados
@@ -371,8 +380,8 @@ base <- left_join(homic,ocult, by = c("ano","uf_resd","cod_uf_resd")) |>
 rm(homic,ocult)
 
 ##Importando população de indígenas
-#Caminho do excel com pnadc
-excel_pnadc <- "C:/Users/gabli/Dropbox/Ipea/Atlas/Pop_Geral_UFs_PNADc.xlsx"
+#Caminho do excel com pnadc geral
+excel_pnadc <- paste0(dirname(getwd()),"/bases/populacao/Pop_Geral_UFs_PNADc.xlsx")
 
 #Importação e empilhando os últimos dez anos da PNADc
 pop_pnadc <- map_dfr(
@@ -401,7 +410,7 @@ pop_pnadc |>
          uf = uf |> as_factor() ) -> pop_pnadc
 
 #Join tabela com homicídio registrado, oculto e projetado e população PNADc - UF
-left_join(x = pop_pnadc, y =  base, by = join_by("ano", "uf" == "uf_resd", "cod_ibge" == "cod_uf_resd")  )  |> rename(uf_resd = uf) |>
+left_join(x = pop_pnadc, y =  base, by = join_by("ano", "uf" == "def_uf_resd", "cod_ibge" == "cod_uf_resd")  ) |> rename(def_uf_resd = uf) |>
   select(!c(cod_ibge) ) -> base
 rm(pop_pnadc)
 
@@ -409,7 +418,7 @@ rm(pop_pnadc)
 #Acrescentando total Brasil e criando taxas
 base %>%
   bind_rows(. |>
-              summarise(uf_resd="Brasil" |> as.factor(),
+              summarise(def_uf_resd="Brasil" |> as.factor(),
                         pop = sum(pop),
                         homicidio = sum(homicidio),
                         ppb2_homicidio = sum(ppb2_homicidio),
@@ -420,7 +429,7 @@ base %>%
 
 ### Tabelas no formato atlas da violência
 #Taxa de homicídio estimado - mulheres
-base |> select(ano,uf_resd,homicidio_proj) |>
+base |> select(ano,def_uf_resd,homicidio_proj) |>
   pivot_wider(names_from = ano,values_from = homicidio_proj) %>%
   #Variações
   mutate(
@@ -437,19 +446,18 @@ base |> select(ano,uf_resd,homicidio_proj) |>
   slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
                 "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
                 "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
-                "Sergipe","Tocantins"),uf_resd) ) |>
+                "Sergipe","Tocantins"),def_uf_resd) ) |>
   # Converte as colunas numéricas para caracteres e substitui pontos por vírgulas.
   #Assim fica mais fácil converter para numérico no excel.
   mutate(across(where(is.numeric), ~ str_replace_all(as.character(.), "\\.", ","))) %>%
-  #Necessário para colocar o título
-  as_tibble() |>
+
+  adorn_title(placement = "top", row_name = "",
+              col_name = glue::glue("Número de homicídios estimados de Mulher, por UF {min(year)}–{max(year)}") ) %>%
   
-  adorn_title(placement = "top",col_name = "Número de homicídios estimados de Mulher, por UF – Brasil {ano}") %>% 
-  
-  rio::export(.,"n_homicidio_mulher_estimados_uf_br.xlsx")
+  rio::export(.,"base/mulheres/oculto/n_homicidio_mulher_estimados_uf_br.xlsx")
 
 #Taxa de homicídio Projetado Mulher
-base |> select(ano,uf_resd,tx_homicidio_proj) |>
+base |> select(ano,def_uf_resd,tx_homicidio_proj) |>
   pivot_wider(names_from = ano,values_from = tx_homicidio_proj) %>%
   #Variações
   mutate(
@@ -466,26 +474,26 @@ base |> select(ano,uf_resd,tx_homicidio_proj) |>
   slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
                 "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
                 "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
-                "Sergipe","Tocantins"),uf_resd) ) |>
+                "Sergipe","Tocantins"),def_uf_resd) ) |>
   # Converte as colunas numéricas para caracteres e substitui pontos por vírgulas.
   #Assim fica mais fácil converter para numérico no excel.
   mutate(across(where(is.numeric), ~ str_replace_all(as.character(.), "\\.", ","))) %>%
   #Necessário para colocar o título
   as_tibble() |>
-  adorn_title(placement = "top",col_name = "Taxa de homicídios projetados de Mulher, por UF – Brasil {ano}") %>% 
+  adorn_title(placement = "top", row_name = "",
+              col_name = glue::glue("Taxa de homicídios projetados de Mulher, por UF {min(year)}–{max(year)}") ) %>% 
   
-  rio::export(.,"taxa_homicidio_estimado_mulher_uf_br.xlsx")
-rm(list = ls() )
+  rio::export(.,"base/mulheres/oculto/tx_homicidio_estimado_mulher_uf_br.xlsx")
+rm(list = ls() ); gc()
 
 
 # Homicídio estimado indígena ---------------------------------------------
 library(tidyverse)
 library(janitor)
-library(glue)
 
 ##Importando população de indígenas
-#Caminho do excel com pnadc
-excel_pnadc <- "C:/Users/gabli/Dropbox/Ipea/Atlas/Pop_Geral_UFs_PNADc.xlsx"
+#Caminho do excel com pnadc geral
+excel_pnadc <- paste0(dirname(getwd()),"/bases/populacao/Pop_Geral_UFs_PNADc.xlsx")
 
 #Importação e empilhando os últimos dez anos da PNADc
 pop_pnadc <- map_dfr(
@@ -513,31 +521,34 @@ pop_pnadc <- map_dfr(
          uf = uf |> as_factor() ) 
 rm(excel_pnadc)
 
-#Importação da base de homicídios ocultos e homicídios registrados.
-load("C:/Users/gabli/Desktop/r/SIM/Atlas 2025/sim_doext_homic_pred_96_23.RData")
-#Período analisado.
-year <- c(2013:2023)
-ano <- paste(min(year), max(year), sep = "-")
+#Pasta Raiz
+here::i_am("Rotinas/Oculto/Tabelas Padrão Ocultos - Atlas  2026.R")
+#Importação base de interesse
+load(paste0(dirname(getwd()),"/bases/homic_oculto/sim_doext_homic_pred_96_24.Rdata"))
+year <- seq(as.integer(format(Sys.Date(), "%Y")) - 12, as.integer(format(Sys.Date(), "%Y")) - 2);gc()
 
 #Homicídios registrado - Indígenas
 sim_doext |> 
   #Filtro das intenções de interesse.
-  filter(intencao_homic  == "Homicídio" & racacor == "Indigena" & ano %in% year) |> 
-  count(ano, cod_uf_resd, uf_resd, name = "homicidio") -> homic
+  filter(intencao_homic  == "Homicídio" & def_racacor == "Indigena" & ano %in% year) |> 
+  count(ano, cod_uf_resd, def_uf_resd, name = "homicidio") |>
+  #Sim duckdb
+  mutate(cod_uf_resd = cod_uf_resd |> as.integer() ) -> homic
  
 #Homicídio oculto - Indígenas
 homic_preds |>
   #Filtrando homicídios ocultos
-  filter(.pred_class == "homic" & racacor == "Indigena" & ano %in% year) |>  
-  count(ano, cod_uf_resd, uf_resd,  name = "ppb2_homicidio") -> ocult
+  filter(.pred_class %in% c("homic","Homicídio") & def_racacor == "Indigena" & ano %in% year) |>  
+  count(ano, cod_uf_resd, def_uf_resd,  name = "ppb2_homicidio") |>
+  mutate(cod_uf_resd = cod_uf_resd |> as.character() |> as.integer() ) -> ocult
 
 #Join das bases de população, registrados e ocultos.
 reduce(.x =
        #Bases de interesse 
-       list(pop_pnadc |> rename(cod_uf_resd = cod_ibge, uf_resd = uf),
+       list(pop_pnadc |> rename(cod_uf_resd = cod_ibge, def_uf_resd = uf),
         homic, ocult),
        .f = left_join, 
-       by = c("ano","cod_uf_resd","uf_resd") ) |> 
+       by = c("ano","cod_uf_resd","def_uf_resd") ) |> 
     #Colocando zeros em UFs sem homicídio registrado (kek) ou sem homicídio oculto.  
     mutate(across(where(is.numeric),~replace_na(.,0)),
        #Homicídios projetados
@@ -547,7 +558,7 @@ reduce(.x =
   
 #Adicionando total Brasil
  bind_rows(. |>
-            summarise(uf_resd="Brasil" |> as.factor(),
+            summarise(def_uf_resd="Brasil" |> as.factor(),
                       pop = sum(pop),
                       homicidio = sum(homicidio),
                       ppb2_homicidio = sum(ppb2_homicidio),
@@ -558,7 +569,7 @@ rm(homic,ocult,pop_pnadc)
 
 ### Tabelas no formato atlas da violência
 #Taxa de homicídio estimado
-base |> select(ano,uf_resd,homicidio_proj) |>
+base |> select(ano,def_uf_resd,homicidio_proj) |>
   pivot_wider(names_from = ano,values_from = homicidio_proj) %>%
   #Variações
   mutate(
@@ -575,19 +586,20 @@ base |> select(ano,uf_resd,homicidio_proj) |>
   slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
                 "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
                 "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
-                "Sergipe","Tocantins"),uf_resd) ) |>
+                "Sergipe","Tocantins"),def_uf_resd) ) |>
   # Converte as colunas numéricas para caracteres e substitui pontos por vírgulas.
   #Assim fica mais fácil converter para numérico no excel.
   mutate(across(where(is.numeric), ~ str_replace_all(as.character(.), "\\.", ","))) %>%
   #Necessário para colocar o título
   as_tibble() |>
   
-  adorn_title(placement = "top",col_name = "Número de homicídios estimados de indíegnas, por UF – Brasil {ano}") %>% 
+  adorn_title(placement = "top", row_name = "",
+              col_name = glue::glue("Número de homicídios estimados de indíegnas, por UF {min(year)}–{max(year)}") ) %>% 
   
-  rio::export(.,"n_homicidio_indígenas_estimados_uf_br.xlsx")
+  rio::export(.,"base/indio/oculto/n_homicidio_indígenas_estimados_uf_br.xlsx")
 
 #Taxa de homicídio Projetado
-base |> select(ano,uf_resd,tx_homicidio_proj) |>
+base |> select(ano,def_uf_resd,tx_homicidio_proj) |>
   pivot_wider(names_from = ano,values_from = tx_homicidio_proj) %>%
   #Variações
   mutate(
@@ -604,16 +616,17 @@ base |> select(ano,uf_resd,tx_homicidio_proj) |>
   slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
                 "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
                 "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
-                "Sergipe","Tocantins"),uf_resd) ) |>
+                "Sergipe","Tocantins"),def_uf_resd) ) |>
   # Converte as colunas numéricas para caracteres e substitui pontos por vírgulas.
   #Assim fica mais fácil converter para numérico no excel.
   mutate(across(where(is.numeric), ~ str_replace_all(as.character(.), "\\.", ","))) %>%
   #Necessário para colocar o título
   as_tibble() |>
   
-  adorn_title(placement = "top",col_name = "Taxa de homicídios projetados de indíegnas, por UF – Brasil {ano}") %>% 
+  adorn_title(placement = "top", row_name = "",
+              col_name = glue::glue("Taxa de homicídios projetados de indíegnas, por UF {min(year)}–{max(year)}") ) %>% 
   
-  rio::export(.,"taxa_homicidio_estimado_indígenas_uf_br.xlsx")
+  rio::export(.,"base/indio/oculto/tx_homicidio_estimado_indígenas_uf_br.xlsx")
 rm(list = ls() )
 
 
@@ -637,7 +650,7 @@ rm(list = ls() )
 # sim_doext |> 
 #   #Filtro das intenções de interesse.
 #   filter(intencao_homic  == "Homicídio" & sexo == "Homem" & idade %in% c(15:29) & ano %in% year) |> droplevels() |>
-#   count(ano,uf_resd,intencao_homic, name = "homicidio") |> 
+#   count(ano,def_uf_resd,intencao_homic, name = "homicidio") |> 
 #   #Mantém variáveis utlizadas
 #   select(!c(intencao_homic)) -> homic
 # 
@@ -645,12 +658,12 @@ rm(list = ls() )
 # homic_preds |> 
 #   #Filtrando homicídios ocultos
 #   filter(.pred_class == "homic" & sexo == "Homem" & idade %in% c(15:29) & ano %in% year) |> droplevels() |>
-#   count(ano,uf_resd,.pred_class, name = "ppb2_homicidio") |> 
+#   count(ano,def_uf_resd,.pred_class, name = "ppb2_homicidio") |> 
 #   #Mantém variáveis utlizadas
 #   select(!c(.pred_class)) -> ocult
 # 
 # #Juntando base homicídio registrado a homicídio coulto
-# base <- left_join(homic,ocult, by = c("ano","uf_resd")) |> 
+# base <- left_join(homic,ocult, by = c("ano","def_uf_resd")) |> 
 #   #Colocando zeros em UFs sem homicídio registrado (kek) ou sem homicídio oculto   
 #   mutate(across(where(is.numeric),~replace_na(.,0)),
 #          #Homicídios projetados
@@ -679,22 +692,22 @@ rm(list = ls() )
 # #População PNADc Homem Jovem
 # pop_pnadc_homem_jovem |> 
 #   #Selecionando variáveis e população desejada, neste caso, população geral
-#   select(uf_resd=UF,ano,
+#   select(def_uf_resd=UF,ano,
 #          #Seleciona população desejada
 #          pop_homem=PoP.Homem) |> 
 #   #Excluindo as regiões.
-#   filter(!(uf_resd %in% c("Norte","Centro Oeste","Nordeste","Sudeste","Sul"))) |>
+#   filter(!(def_uf_resd %in% c("Norte","Centro Oeste","Nordeste","Sudeste","Sul"))) |>
 #   #Transofrmando em factor variáveis desejadas
 #   mutate(ano = ano |> as_factor(),
-#          uf_resd = uf_resd |> as_factor()) -> pop_pnadc_homem_jovem
+#          def_uf_resd = def_uf_resd |> as_factor()) -> pop_pnadc_homem_jovem
 # 
 # #Join tabela com homicídio registrado, oculto e projetado e população PNADc - UF
-# left_join(pop_pnadc_homem_jovem,base, by = c("ano","uf_resd"))  -> base
+# left_join(pop_pnadc_homem_jovem,base, by = c("ano","def_uf_resd"))  -> base
 # rm(pop_pnadc_homem_jovem)
 # 
 # #Acrescentando população, registrado, oculto e projetado Brasil à base trabalhada.
 # base |>
-#   summarise(uf_resd="Brasil" |> as.factor(),
+#   summarise(def_uf_resd="Brasil" |> as.factor(),
 #             pop_homem = sum(pop_homem),
 #             homicidio = sum(homicidio),
 #             ppb2_homicidio = sum(ppb2_homicidio),
@@ -711,7 +724,7 @@ rm(list = ls() )
 # 
 # ### Tabelas no formato atlas da violência
 # #Homicídio Projetado Homem jovem - Valor absoluto
-# base |> select(ano,uf_resd,homicidio_proj) |>
+# base |> select(ano,def_uf_resd,homicidio_proj) |>
 #   pivot_wider(names_from = ano,values_from = homicidio_proj) %>%
 #   #Variações 
 #   mutate(x = format(round(pull(((.[, ncol(.)] /.[, 2])-1)*100),digits = 1), nsmall = 1), #Variação de 10 anos.
@@ -724,12 +737,12 @@ rm(list = ls() )
 #   slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
 #                 "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
 #                 "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
-#                 "Sergipe","Tocantins"),uf_resd)) |>
+#                 "Sergipe","Tocantins"),def_uf_resd)) |>
 #   adorn_title(placement = "top",col_name = "Número de homicídios projetados de jovens de 15 a 29 anos por UF (2012 a 2022)") %>% 
 #   rio::export(.,"n_homicidio_homem_jovem_projetado_uf_br.xlsx")
 # 
 # #Taxa de homicídio Projetado Homem Jovem
-# base |> select(ano,uf_resd,tx_homicidio_proj) |>
+# base |> select(ano,def_uf_resd,tx_homicidio_proj) |>
 #   pivot_wider(names_from = ano,values_from = tx_homicidio_proj) %>%
 #   #Variações 
 #   mutate(x = format(round(pull(((.[, ncol(.)] /.[, 2])-1)*100),digits = 1), nsmall = 1), #Variação de 10 anos.
@@ -742,7 +755,7 @@ rm(list = ls() )
 #   slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
 #                 "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
 #                 "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
-#                 "Sergipe","Tocantins"),uf_resd)) |>
+#                 "Sergipe","Tocantins"),def_uf_resd)) |>
 #   adorn_title(placement = "top",col_name = "Taxa de homicídios projetados, por UF – Brasil (2012-2022)") %>% 
 #   rio::export(.,"taxa_homicidio_homem_jovem_projetado_uf_br.xlsx")
 # rm(base)
@@ -762,7 +775,7 @@ rm(list = ls() )
 # sim_doext |> 
 #   #Filtro das intenções de interesse.
 #   filter(intencao_homic  == "Homicídio" & sexo == "Mulher" & racacor %in% c("Preta","Parda") & ano %in% year) |> droplevels() |>
-#   count(ano,uf_resd,intencao_homic, name = "homicidio") |> 
+#   count(ano,def_uf_resd,intencao_homic, name = "homicidio") |> 
 #   #Mantém variáveis utlizadas
 #   select(!c(intencao_homic)) -> homic
 # 
@@ -770,12 +783,12 @@ rm(list = ls() )
 # homic_preds |> 
 #   #Filtrando homicídios ocultos
 #   filter(.pred_class == "homic" & sexo == "Mulher" & racacor %in% c("Preta","Parda") & ano %in% year) |> droplevels() |>
-#   count(ano,uf_resd,.pred_class, name = "ppb2_homicidio") |> 
+#   count(ano,def_uf_resd,.pred_class, name = "ppb2_homicidio") |> 
 #   #Mantém variáveis utlizadas
 #   select(!c(.pred_class)) -> ocult
 # 
 # #Juntando base homicídio registrado a homicídio coulto
-# base <- left_join(homic,ocult, by = c("ano","uf_resd")) |> 
+# base <- left_join(homic,ocult, by = c("ano","def_uf_resd")) |> 
 #   #Colocando zeros em UFs sem homicídio registrado (kek) ou sem homicídio oculto   
 #   mutate(across(where(is.numeric),~replace_na(.,0)),
 #          #Homicídios projetados
@@ -805,22 +818,22 @@ rm(list = ls() )
 # #População PNADc Mulher
 # pop_pnadc_mulher_negra |> 
 #   #Selecionando variáveis e população desejada, neste caso, população mulher negra
-#   select(uf_resd=UF,ano,
+#   select(def_uf_resd=UF,ano,
 #          #Seleciona população desejada
 #          pop_mulher_negra=M.Negro) |> 
 #   #Excluindo as regiões.
-#   filter(!(uf_resd %in% c("Norte","Centro Oeste","Nordeste","Sudeste","Sul"))) |>
+#   filter(!(def_uf_resd %in% c("Norte","Centro Oeste","Nordeste","Sudeste","Sul"))) |>
 #   #Transofrmando em factor variáveis desejadas
 #   mutate(ano = ano |> as_factor(),
-#          uf_resd = uf_resd |> as_factor()) -> pop_pnadc_mulher_negra
+#          def_uf_resd = def_uf_resd |> as_factor()) -> pop_pnadc_mulher_negra
 # 
 # #Join tabela com homicídio registrado, oculto e projetado e população PNADc - UF
-# left_join(pop_pnadc_mulher_negra,base, by = c("ano","uf_resd"))  -> base
+# left_join(pop_pnadc_mulher_negra,base, by = c("ano","def_uf_resd"))  -> base
 # rm(pop_pnadc_mulher_negra)
 # 
 # #Acrescentando população, registrado, oculto e projetado Brasil à base trabalhada.
 # base |>
-#   summarise(uf_resd="Brasil" |> as.factor(),
+#   summarise(def_uf_resd="Brasil" |> as.factor(),
 #             pop_mulher_negra = sum(pop_mulher_negra),
 #             homicidio = sum(homicidio),
 #             ppb2_homicidio = sum(ppb2_homicidio),
@@ -837,7 +850,7 @@ rm(list = ls() )
 # 
 # ### Tabelas no formato atlas da violência
 # #Homicídio Projetado mulher negra - Valor absoluto
-# base |> select(ano,uf_resd,homicidio_proj) |>
+# base |> select(ano,def_uf_resd,homicidio_proj) |>
 #   pivot_wider(names_from = ano,values_from = homicidio_proj) %>%
 #   #Variações 
 #   mutate(x = format(round(pull(((.[, ncol(.)] /.[, 2])-1)*100),digits = 1), nsmall = 1), #Variação de 10 anos.
@@ -850,12 +863,12 @@ rm(list = ls() )
 #   slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
 #                 "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
 #                 "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
-#                 "Sergipe","Tocantins"),uf_resd)) |>
+#                 "Sergipe","Tocantins"),def_uf_resd)) |>
 #   adorn_title(placement = "top",col_name = "Número de homicídios projetados de Mulher Negra por UF (2012 a 2022)") %>% 
 #   rio::export(.,"n_homicidio_mulher_negra_projetado_uf_br.xlsx")
 # 
 # #Taxa de homicídio Projetado Mulher Negra
-# base |> select(ano,uf_resd,tx_homicidio_proj) |>
+# base |> select(ano,def_uf_resd,tx_homicidio_proj) |>
 #   pivot_wider(names_from = ano,values_from = tx_homicidio_proj) %>%
 #   #Variações 
 #   mutate(x = format(round(pull(((.[, ncol(.)] /.[, 2])-1)*100),digits = 1), nsmall = 1), #Variação de 10 anos.
@@ -868,7 +881,7 @@ rm(list = ls() )
 #   slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
 #                 "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
 #                 "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
-#                 "Sergipe","Tocantins"),uf_resd)) |>
+#                 "Sergipe","Tocantins"),def_uf_resd)) |>
 #   adorn_title(placement = "top",col_name = "Taxa de homicídios projetados de Mulher Negra, por UF – Brasil (2012-2022)") %>% 
 #   rio::export(.,"taxa_homicidio_projetado_mulher_negra_uf_br.xlsx")
 # rm(base)
@@ -882,10 +895,10 @@ rm(list = ls() )
 # 
 # #Painel com as UFs 
 # siconfir::get_info() |> filter(esfera %in% c("E","D")) |>
-#   select(uf_resd = ente) |>
+#   select(def_uf_resd = ente) |>
 #   #Colocando anos investigados
 #   crossing(data.frame(ano = year)) |>
-#   mutate(uf_resd = uf_resd |> as_factor(),
+#   mutate(def_uf_resd = def_uf_resd |> as_factor(),
 #          ano = ano |> as_factor()) -> painel_ufs
 # 
 # 
@@ -893,7 +906,7 @@ rm(list = ls() )
 # sim_doext |> 
 #   #Filtro das intenções de interesse.
 #   filter(intencao_homic  == "Homicídio" & sexo == "Mulher" & racacor %in% c("Amarela","Branca","Indigena") & ano %in% year) |> droplevels() |>
-#   count(ano,uf_resd,intencao_homic, name = "homicidio") |> 
+#   count(ano,def_uf_resd,intencao_homic, name = "homicidio") |> 
 #   #Mantém variáveis utlizadas
 #   select(!c(intencao_homic)) -> homic
 # 
@@ -901,12 +914,12 @@ rm(list = ls() )
 # homic_preds |> 
 #   #Filtrando homicídios ocultos
 #   filter(.pred_class == "homic" & sexo == "Mulher" & racacor %in% c("Amarela","Branca","Indigena") & ano %in% year) |> droplevels() |>
-#   count(ano,uf_resd,.pred_class, name = "ppb2_homicidio") |> 
+#   count(ano,def_uf_resd,.pred_class, name = "ppb2_homicidio") |> 
 #   #Mantém variáveis utlizadas
 #   select(!c(.pred_class)) -> ocult
 # 
 # #Juntando base painel de ufs, homicídio registrado e homicídio coulto
-# base <- list(painel_ufs, homic, ocult) %>% reduce(left_join, by = c("ano","uf_resd")) |>
+# base <- list(painel_ufs, homic, ocult) %>% reduce(left_join, by = c("ano","def_uf_resd")) |>
 #   #Colocando zeros em UFs sem homicídio registrado ou sem homicídio oculto   
 #   mutate(across(where(is.numeric),~replace_na(.,0)),
 #          #Homicídios projetados
@@ -935,22 +948,22 @@ rm(list = ls() )
 # #População PNADc Mulher não negra
 # pop_pnadc_mulher_nao_negra |> 
 #   #Selecionando variáveis e população desejada, neste caso, população mulher nao negra
-#   select(uf_resd=UF,ano,
+#   select(def_uf_resd=UF,ano,
 #          #Seleciona população desejada
 #          pop_mulher_nao_negra=M.Não_Negra) |> 
 #   #Excluindo as regiões.
-#   filter(!(uf_resd %in% c("Norte","Centro Oeste","Nordeste","Sudeste","Sul"))) |>
+#   filter(!(def_uf_resd %in% c("Norte","Centro Oeste","Nordeste","Sudeste","Sul"))) |>
 #   #Transofrmando em factor variáveis desejadas
 #   mutate(ano = ano |> as_factor(),
-#          uf_resd = uf_resd |> as_factor()) -> pop_pnadc_mulher_nao_negra
+#          def_uf_resd = def_uf_resd |> as_factor()) -> pop_pnadc_mulher_nao_negra
 # 
 # #Join tabela com homicídio registrado, oculto e projetado e população PNADc - UF
-# left_join(pop_pnadc_mulher_nao_negra,base, by = c("ano","uf_resd")) -> base
+# left_join(pop_pnadc_mulher_nao_negra,base, by = c("ano","def_uf_resd")) -> base
 # rm(pop_pnadc_mulher_nao_negra)
 # 
 # #Acrescentando população, registrado, oculto e projetado Brasil à base trabalhada.
 # base |>
-#   summarise(uf_resd="Brasil" |> as.factor(),
+#   summarise(def_uf_resd="Brasil" |> as.factor(),
 #             pop_mulher_nao_negra = sum(pop_mulher_nao_negra),
 #             homicidio = sum(homicidio),
 #             ppb2_homicidio = sum(ppb2_homicidio),
@@ -967,7 +980,7 @@ rm(list = ls() )
 # 
 # ### Tabelas no formato atlas da violência
 # #Homicídio Projetado mulher não negra - Valor absoluto
-# base |> select(ano,uf_resd,homicidio_proj) |>
+# base |> select(ano,def_uf_resd,homicidio_proj) |>
 #   pivot_wider(names_from = ano,values_from = homicidio_proj) %>%
 #   #Variações 
 #   mutate(x = format(round(pull(((.[, ncol(.)] /.[, 2])-1)*100),digits = 1), nsmall = 1), #Variação de 10 anos.
@@ -980,12 +993,12 @@ rm(list = ls() )
 #   slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
 #                 "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
 #                 "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
-#                 "Sergipe","Tocantins"),uf_resd)) |>
+#                 "Sergipe","Tocantins"),def_uf_resd)) |>
 #   adorn_title(placement = "top",col_name = "Número de homicídios projetados de Mulher Não Negra por UF (2012 a 2022)") %>% 
 #   rio::export(.,"n_homicidio_mulher_nao_negra_projetado_uf_br.xlsx")
 # 
 # #Taxa de homicídio Projetado Mulher não Negra
-# base |> select(ano,uf_resd,tx_homicidio_proj) |>
+# base |> select(ano,def_uf_resd,tx_homicidio_proj) |>
 #   pivot_wider(names_from = ano,values_from = tx_homicidio_proj) %>%
 #   #Variações 
 #   mutate(x = format(round(pull(((.[, ncol(.)] /.[, 2])-1)*100),digits = 1), nsmall = 1), #Variação de 10 anos.
@@ -998,7 +1011,7 @@ rm(list = ls() )
 #   slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
 #                 "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
 #                 "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
-#                 "Sergipe","Tocantins"),uf_resd)) |>
+#                 "Sergipe","Tocantins"),def_uf_resd)) |>
 #   adorn_title(placement = "top",col_name = "Taxa de homicídios projetados de Mulher não Negra, por UF – Brasil (2012-2022)") %>% 
 #   rio::export(.,"taxa_homicidio_projetado_mulher_nao_negra_uf_br.xlsx")
 # rm(base)
@@ -1092,10 +1105,10 @@ rm(list = ls() )
 # 
 # #Painel com as UFs 
 # siconfir::get_info() |> filter(esfera %in% c("E","D")) |>
-#   select(uf_resd = ente) |>
+#   select(def_uf_resd = ente) |>
 #   #Colocando anos investigados
 #   crossing(data.frame(ano = year)) |>
-#   mutate(uf_resd = uf_resd |> as_factor(),
+#   mutate(def_uf_resd = def_uf_resd |> as_factor(),
 #          ano = ano |> as_factor()) -> painel_ufs
 # 
 # 
@@ -1103,7 +1116,7 @@ rm(list = ls() )
 # sim_doext |> 
 #   #Filtro das intenções de interesse.
 #   filter(intencao_homic  == "Homicídio" & racacor %in% c("Parda","Preta") & ano %in% year) |> droplevels() |>
-#   count(ano,uf_resd,intencao_homic, name = "homicidio") |> 
+#   count(ano,def_uf_resd,intencao_homic, name = "homicidio") |> 
 #   #Mantém variáveis utlizadas
 #   select(!c(intencao_homic)) -> homic
 # 
@@ -1111,12 +1124,12 @@ rm(list = ls() )
 # homic_preds |> 
 #   #Filtrando homicídios ocultos
 #   filter(.pred_class == "homic" & racacor %in% c("Parda","Preta") & ano %in% year) |> droplevels() |>
-#   count(ano,uf_resd,.pred_class, name = "ppb2_homicidio") |> 
+#   count(ano,def_uf_resd,.pred_class, name = "ppb2_homicidio") |> 
 #   #Mantém variáveis utlizadas
 #   select(!c(.pred_class)) -> ocult
 # 
 # #Juntando base painel de ufs, homicídio registrado e homicídio coulto
-# base <- list(painel_ufs, homic, ocult) %>% reduce(left_join, by = c("ano","uf_resd")) |>
+# base <- list(painel_ufs, homic, ocult) %>% reduce(left_join, by = c("ano","def_uf_resd")) |>
 #   #Colocando zeros em UFs sem homicídio registrado ou sem homicídio oculto   
 #   mutate(across(where(is.numeric),~replace_na(.,0)),
 #          #Homicídios projetados
@@ -1145,22 +1158,22 @@ rm(list = ls() )
 # #População PNADc Negros
 # pop_pnadc_negros |> 
 #   #Selecionando variáveis e população desejada, neste caso, população negro
-#   select(uf_resd=UF,ano,
+#   select(def_uf_resd=UF,ano,
 #          #Seleciona população desejada
 #          pop_negro=Pop.Negro) |> 
 #   #Excluindo as regiões.
-#   filter(!(uf_resd %in% c("Norte","Centro Oeste","Nordeste","Sudeste","Sul"))) |>
+#   filter(!(def_uf_resd %in% c("Norte","Centro Oeste","Nordeste","Sudeste","Sul"))) |>
 #   #Transofrmando em factor variáveis desejadas
 #   mutate(ano = ano |> as_factor(),
-#          uf_resd = uf_resd |> as_factor()) -> pop_pnadc_negros
+#          def_uf_resd = def_uf_resd |> as_factor()) -> pop_pnadc_negros
 # 
 # #Join tabela com homicídio registrado, oculto e projetado e população PNADc - UF
-# left_join(pop_pnadc_negros,base, by = c("ano","uf_resd")) -> base
+# left_join(pop_pnadc_negros,base, by = c("ano","def_uf_resd")) -> base
 # rm(pop_pnadc_negros)
 # 
 # #Acrescentando população, registrado, oculto e projetado Brasil à base trabalhada.
 # base |>
-#   summarise(uf_resd="Brasil" |> as.factor(),
+#   summarise(def_uf_resd="Brasil" |> as.factor(),
 #             pop_negro = sum(pop_negro),
 #             homicidio = sum(homicidio),
 #             ppb2_homicidio = sum(ppb2_homicidio),
@@ -1177,7 +1190,7 @@ rm(list = ls() )
 # 
 # ### Tabelas no formato atlas da violência
 # #Homicídio Projetado Negro - Valor absoluto
-# base |> select(ano,uf_resd,homicidio_proj) |>
+# base |> select(ano,def_uf_resd,homicidio_proj) |>
 #   pivot_wider(names_from = ano,values_from = homicidio_proj) %>%
 #   #Variações 
 #   mutate(x = format(round(pull(((.[, ncol(.)] /.[, 2])-1)*100),digits = 1), nsmall = 1), #Variação de 10 anos.
@@ -1190,12 +1203,12 @@ rm(list = ls() )
 #   slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
 #                 "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
 #                 "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
-#                 "Sergipe","Tocantins"),uf_resd)) |>
+#                 "Sergipe","Tocantins"),def_uf_resd)) |>
 #   adorn_title(placement = "top",col_name = "Número de homicídios projetados de Negros, por UF (2012 a 2022)") %>% 
 #   rio::export(.,"n_homicidio_negros_projetado_uf_br.xlsx")
 # 
 # #Taxa de homicídio Projetado Negros
-# base |> select(ano,uf_resd,tx_homicidio_proj) |>
+# base |> select(ano,def_uf_resd,tx_homicidio_proj) |>
 #   pivot_wider(names_from = ano,values_from = tx_homicidio_proj) %>%
 #   #Variações 
 #   mutate(x = format(round(pull(((.[, ncol(.)] /.[, 2])-1)*100),digits = 1), nsmall = 1), #Variação de 10 anos.
@@ -1208,7 +1221,7 @@ rm(list = ls() )
 #   slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
 #                 "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
 #                 "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
-#                 "Sergipe","Tocantins"),uf_resd)) |>
+#                 "Sergipe","Tocantins"),def_uf_resd)) |>
 #   adorn_title(placement = "top",col_name = "Taxa de homicídios projetados de Negros, por UF – Brasil (2012-2022)") %>% 
 #   rio::export(.,"taxa_homicidio_projetado_negros_uf_br.xlsx")
 # rm(base)
@@ -1223,17 +1236,17 @@ rm(list = ls() )
 # 
 # #Painel com as UFs 
 # siconfir::get_info() |> filter(esfera %in% c("E","D")) |>
-#   select(uf_resd = ente) |>
+#   select(def_uf_resd = ente) |>
 #   #Colocando anos investigados
 #   crossing(data.frame(ano = year)) |>
-#   mutate(uf_resd = uf_resd |> as_factor(),
+#   mutate(def_uf_resd = def_uf_resd |> as_factor(),
 #          ano = ano |> as_factor()) -> painel_ufs
 # 
 # #Contagem de homicídios registrados de não negros, por ano e UF
 # sim_doext |> 
 #   #Filtro das intenções de interesse.
 #   filter(intencao_homic  == "Homicídio" & racacor %in% c("Branca","Amarela","Indigena") & ano %in% year) |> droplevels() |>
-#   count(ano,uf_resd,intencao_homic, name = "homicidio") |> 
+#   count(ano,def_uf_resd,intencao_homic, name = "homicidio") |> 
 #   #Mantém variáveis utlizadas
 #   select(!c(intencao_homic)) -> homic
 # 
@@ -1241,12 +1254,12 @@ rm(list = ls() )
 # homic_preds |> 
 #   #Filtrando homicídios ocultos
 #   filter(.pred_class == "homic" & racacor %in% c("Branca","Amarela","Indigena") & ano %in% year) |> droplevels() |>
-#   count(ano,uf_resd,.pred_class, name = "ppb2_homicidio") |> 
+#   count(ano,def_uf_resd,.pred_class, name = "ppb2_homicidio") |> 
 #   #Mantém variáveis utlizadas
 #   select(!c(.pred_class)) -> ocult
 # 
 # #Juntando base painel de ufs, homicídio registrado e homicídio coulto
-# base <- list(painel_ufs, homic, ocult) %>% reduce(left_join, by = c("ano","uf_resd")) |>
+# base <- list(painel_ufs, homic, ocult) %>% reduce(left_join, by = c("ano","def_uf_resd")) |>
 #   #Colocando zeros em UFs sem homicídio registrado ou sem homicídio oculto   
 #   mutate(across(where(is.numeric),~replace_na(.,0)),
 #          #Homicídios projetados
@@ -1275,22 +1288,22 @@ rm(list = ls() )
 # #População PNADc Negros
 # pop_pnadc_nao_negros |> 
 #   #Selecionando variáveis e população desejada, neste caso, população negro
-#   select(uf_resd=UF,ano,
+#   select(def_uf_resd=UF,ano,
 #          #Seleciona população desejada
 #          pop_nao_negro=Pop.Não_Negra) |> 
 #   #Excluindo as regiões.
-#   filter(!(uf_resd %in% c("Norte","Centro Oeste","Nordeste","Sudeste","Sul"))) |>
+#   filter(!(def_uf_resd %in% c("Norte","Centro Oeste","Nordeste","Sudeste","Sul"))) |>
 #   #Transofrmando em factor variáveis desejadas
 #   mutate(ano = ano |> as_factor(),
-#          uf_resd = uf_resd |> as_factor()) -> pop_pnadc_nao_negros
+#          def_uf_resd = def_uf_resd |> as_factor()) -> pop_pnadc_nao_negros
 # 
 # #Join tabela com homicídio registrado, oculto e projetado e população PNADc - UF
-# left_join(pop_pnadc_nao_negros,base, by = c("ano","uf_resd")) -> base
+# left_join(pop_pnadc_nao_negros,base, by = c("ano","def_uf_resd")) -> base
 # rm(pop_pnadc_nao_negros)
 # 
 # #Acrescentando população, registrado, oculto e projetado Brasil à base trabalhada.
 # base |>
-#   summarise(uf_resd="Brasil" |> as.factor(),
+#   summarise(def_uf_resd="Brasil" |> as.factor(),
 #             pop_nao_negro = sum(pop_nao_negro),
 #             homicidio = sum(homicidio),
 #             ppb2_homicidio = sum(ppb2_homicidio),
@@ -1307,7 +1320,7 @@ rm(list = ls() )
 # 
 # ### Tabelas no formato atlas da violência
 # #Homicídio Projetado Não Negro - Valor absoluto
-# base |> select(ano,uf_resd,homicidio_proj) |>
+# base |> select(ano,def_uf_resd,homicidio_proj) |>
 #   pivot_wider(names_from = ano,values_from = homicidio_proj) %>%
 #   #Variações 
 #   mutate(x = format(round(pull(((.[, ncol(.)] /.[, 2])-1)*100),digits = 1), nsmall = 1), #Variação de 10 anos.
@@ -1320,12 +1333,12 @@ rm(list = ls() )
 #   slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
 #                 "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
 #                 "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
-#                 "Sergipe","Tocantins"),uf_resd)) |>
+#                 "Sergipe","Tocantins"),def_uf_resd)) |>
 #   adorn_title(placement = "top",col_name = "Número de homicídios projetados de Não Negros, por UF (2012 a 2022)") %>% 
 #   rio::export(.,"n_homicidio_nao_negro_projetado_uf_br.xlsx")
 # 
 # #Taxa de homicídio Projetado Não Negros
-# base |> select(ano,uf_resd,tx_homicidio_proj) |>
+# base |> select(ano,def_uf_resd,tx_homicidio_proj) |>
 #   pivot_wider(names_from = ano,values_from = tx_homicidio_proj) %>%
 #   #Variações 
 #   mutate(x = format(round(pull(((.[, ncol(.)] /.[, 2])-1)*100),digits = 1), nsmall = 1), #Variação de 10 anos.
@@ -1338,7 +1351,7 @@ rm(list = ls() )
 #   slice(match(c("Brasil", "Acre", "Alagoas", "Amapá", "Amazonas", "Bahia","Ceará","Distrito Federal","Espírito Santo","Goiás",
 #                 "Maranhão","Mato Grosso","Mato Grosso do Sul","Minas Gerais","Pará","Paraíba","Paraná","Pernambuco","Piauí",
 #                 "Rio de Janeiro","Rio Grande do Norte","Rio Grande do Sul","Rondônia","Roraima","Santa Catarina","São Paulo",
-#                 "Sergipe","Tocantins"),uf_resd)) |>
+#                 "Sergipe","Tocantins"),def_uf_resd)) |>
 #   adorn_title(placement = "top",col_name = "Taxa de homicídios projetados de Não Negros, por UF – Brasil (2012-2022)") %>% 
 #   rio::export(.,"taxa_homicidio_projetado_nao_negros_uf_br.xlsx")
 # 
