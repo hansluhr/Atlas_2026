@@ -23,7 +23,7 @@ homic_preds_96_23 <- homic_preds_96_23 |>
          across(.cols = c(cod_uf_resd,cod_uf_ocor), 
                 .fns = ~ as_factor(.) ) )
 
-#Importação dos homicídios ocultos de 2023
+#Importação dos homicídios ocultos de 2024
 load(paste0(dirname(getwd()),"/bases/homic_oculto/homic_preds_96_24.RData"))
 rm(list = setdiff(ls(),c("homic_preds_96_23","homic_preds")))
 
@@ -41,7 +41,7 @@ rm(homic_preds_96_23); gc()
 #Mantém os seis primeiros dígitos no código do município
 homic_preds <- 
   homic_preds |>
-  mutate(across(c(codmunocor, codmunres), ~ substr(., 1, 6))) 
+  mutate(across(c(codmunocor, codmunresd), ~ substr(., 1, 6))) 
 
 
 # #Adicionar município de residência
@@ -95,7 +95,8 @@ homic_preds <-
 
 
 
-
+#Importando a base sim_doext
+load("G:/gab_lins/Projetos/bases/sim/RData/sim_doext_14_24.RData")
 
 #Salvando base com todos os períodos
 save.image(paste0(dirname(getwd()),"/bases/homic_oculto/sim_doext_homic_pred_96_24.RData") )
