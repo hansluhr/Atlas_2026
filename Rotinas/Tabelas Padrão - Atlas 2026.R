@@ -3415,7 +3415,7 @@ base |>
   
   theme(axis.text.y = element_text(face = "bold") )
 ggsave(filename ="base/sinistro/figuras/p_acid_moto.bmp",width = 11,height = 8,device='bmp', dpi=150)
-ggsave(filename ="base/eca/figura/p_acid_moto.eps",width = 11,height = 8,device=cairo_ps, dpi=150)
+ggsave(filename ="base/sinistro/figura/p_acid_moto.eps",width = 11,height = 8,device=cairo_ps, dpi=150)
 
 
 
