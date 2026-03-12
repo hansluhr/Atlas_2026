@@ -2,91 +2,97 @@ library(tidyverse)
 library(janitor)
 
 # Import de base homicídio registrado e projetado -------------------------
-load("C:/Users/gabli/Desktop/r/SIM/Atlas 2025/sim_doext_homic_pred_96_23.RData")
-#Período analisado
-year <- c(2013:2023)
+#Pasta Raiz
+here::i_am("Rotinas/Oculto/Atlas dos Municípios 2026.R")
+#Importação base de interesse
+load(paste0(dirname(getwd()),"/bases/homic_oculto/sim_doext_homic_pred_96_24.Rdata"))
+year <- seq(as.integer(format(Sys.Date(), "%Y")) - 12, as.integer(format(Sys.Date(), "%Y")) - 2);gc()
+
 
 # Importando base com todos os municípios do país.  -----------------------
 #Fonte: https://www.ibge.gov.br/explica/codigos-dos-municipios.php
-base_munics <- readxl::read_excel("D:/Dropbox/Ipea/Atlas/municipios_br.xls",sheet = "munics") |>
-  select("Nome_UF", "Código Município Completo","Nome_Município") |> clean_names() |>
-  rename(cod_ibge = "codigo_municipio_completo", munic_resd = nome_municipio,uf_resd = nome_uf) |>
-  #No microdado do SIM. A partir de 2006 o código do município aparece com 6. 
-  #Vou deixar todos os municípios em todos os anos com 6 dígitos.
-  mutate(cod_ibge = substr(cod_ibge,1,6)) 
+# base_munics <- readxl::read_excel("D:/Dropbox/Ipea/Atlas/municipios_br.xls",sheet = "munics") |>
+#   select("Nome_UF", "Código Município Completo","Nome_Município") |> clean_names() |>
+#   rename(cod_ibge = "codigo_municipio_completo", munic_resd = nome_municipio,def_uf_resd = nome_uf) |>
+#   #No microdado do SIM. A partir de 2006 o código do município aparece com 6. 
+#   #Vou deixar todos os municípios em todos os anos com 6 dígitos.
+#   mutate(cod_ibge = substr(cod_ibge,1,6)) 
+# 
+# #Adicionando município Ignorado ou exterior. 
+# #A saúde utiliza código de município ingorado. Esses municípios não aparecem em outras bases.
+# munics_ign <- tribble(~cod_ibge,~munic_resd, ~def_uf_resd,
+#                       "000000", "Ignorado ou exterior", "Ignorado ou exterior",
+#                       "110000", "Município ignorado - RO", "Rondônia",
+#                       "130000", "Município ignorado - AM", "Amazonas", 
+#                       "150000", "Município ignorado - PA", "Pará", 
+#                       "210000", "Município ignorado - MA", "Maranhão",
+#                       "170000", "Município ignorado - TO", "Tocantins",
+#                       "240000", "Município ignorado - RN", "Rio Grande do Norte",
+#                       "260000" ,"Município ignorado - PE", "Pernambuco",
+#                       "280000", "Município ignorado - SE", "Sergipe",
+#                       "310000", "Município ignorado - MG", "Minas Gerais",
+#                       "330000", "Município ignorado - RJ", "Rio de Janeiro",
+#                       "410000", "Município ignorado - PR", "Paraná",
+#                       "430000", "Município ignorado - RS", "Rio Grande do Sul",
+#                       "510000", "Município ignorado - MT", "Mato Grosso",
+#                       "520000", "Município ignorado - GO", "Goiás",
+#                       "120000", "Município ignorado - AC", "Acre",        
+#                       "140000", "Município ignorado - RR", "Roraima",
+#                       "160000", "Município ignorado - AP", "Amapá",  
+#                       "220000", "Município ignorado - PI", "Piauí",
+#                       "230000", "Município ignorado - CE", "Ceará",  
+#                       "250000", "Município ignorado - PB", "Paraíba",
+#                       "270000", "Município ignorado - AL", "Alagoas",
+#                       "290000", "Município ignorado - BA", "Bahia",
+#                       "320000", "Município ignorado - ES", "Espírito Santo",
+#                       "350000", "Município ignorado - SP", "São Paulo",
+#                       "420000", "Município ignorado - SC", "Santa Catarina",
+#                       "500000", "Município ignorado - MS",  "Mato Grosso do Sul")
+# 
+# #Não estão incluídios os municípios que são bairros presentes no início da série.
+# #Por exemplo, Rio de Janeiro.
+# 
+# #Bind de municípios conhecidos e ignorados.
+# bind_rows(base_munics,munics_ign) -> base_munics
+# rm(munics_ign)
+# 
 
-#Adicionando município Ignorado ou exterior. 
-#A saúde utiliza código de município ingorado. Esses municípios não aparecem em outras bases.
-munics_ign <- tribble(~cod_ibge,~munic_resd, ~uf_resd,
-                      "000000", "Ignorado ou exterior", "Ignorado ou exterior",
-                      "110000", "Município ignorado - RO", "Rondônia",
-                      "130000", "Município ignorado - AM", "Amazonas", 
-                      "150000", "Município ignorado - PA", "Pará", 
-                      "210000", "Município ignorado - MA", "Maranhão",
-                      "170000", "Município ignorado - TO", "Tocantins",
-                      "240000", "Município ignorado - RN", "Rio Grande do Norte",
-                      "260000" ,"Município ignorado - PE", "Pernambuco",
-                      "280000", "Município ignorado - SE", "Sergipe",
-                      "310000", "Município ignorado - MG", "Minas Gerais",
-                      "330000", "Município ignorado - RJ", "Rio de Janeiro",
-                      "410000", "Município ignorado - PR", "Paraná",
-                      "430000", "Município ignorado - RS", "Rio Grande do Sul",
-                      "510000", "Município ignorado - MT", "Mato Grosso",
-                      "520000", "Município ignorado - GO", "Goiás",
-                      "120000", "Município ignorado - AC", "Acre",        
-                      "140000", "Município ignorado - RR", "Roraima",
-                      "160000", "Município ignorado - AP", "Amapá",  
-                      "220000", "Município ignorado - PI", "Piauí",
-                      "230000", "Município ignorado - CE", "Ceará",  
-                      "250000", "Município ignorado - PB", "Paraíba",
-                      "270000", "Município ignorado - AL", "Alagoas",
-                      "290000", "Município ignorado - BA", "Bahia",
-                      "320000", "Município ignorado - ES", "Espírito Santo",
-                      "350000", "Município ignorado - SP", "São Paulo",
-                      "420000", "Município ignorado - SC", "Santa Catarina",
-                      "500000", "Município ignorado - MS",  "Mato Grosso do Sul")
-
-#Não estão incluídios os municípios que são bairros presentes no início da série.
-#Por exemplo, Rio de Janeiro.
-
-#Bind de municípios conhecidos e ignorados.
-bind_rows(base_munics,munics_ign) -> base_munics
-rm(munics_ign)
-
-#Criando Painel de dados com os municípios.
-base_munics |>
-  expand_grid(ano = year) -> base_munics
-
-
+#Importação base de municípíos e elaboração de painel de municípios
+base_munics <- readxl::read_excel("G:/gab_lins/Projetos/bases/Bases Gerais/munics.xlsx") |>
+  #Painel de municípios
+  expand_grid(ano = year) |>
+  rename(cod_ibge = code_muni,
+         def_uf_resd = name_state)
+  
 #Contagem de homicídios registrados em cada município de residência. 
 sim_doext |> 
   #Filtro da intenção de interesse.
-  filter(intencao_homic  == "Homicídio" & ano %in% year) |> droplevels() |>
-  count(ano, uf_resd, codmunres,intencao_homic, name = "homic_reg") |> select(!c(intencao_homic)) |>
+  filter(intencao_homic  == "Homicídio" & ano %in% year) |> 
+  count(ano, def_uf_resd, codmunresd, intencao_homic, name = "homic_reg") |> select(!c(intencao_homic)) |>
   mutate(ano = ano |> as.character() |> as.integer(), 
          #No microdado do SIM. A partir de 2006 o código do município aparece com 6. 
          #Vou deixar todos os municípios em todos os anos com 6 dígitos.
-         codmunres = substr(codmunres,1,6)) |> as_tibble() -> homic_regis
+         codmunresd = substr(codmunresd,1,6) ) -> homic_regis
 
 #Contagem de homicídios OCULTOS em cada município
 homic_preds |> 
   #Filtro das intenções de interesse.
-  filter(.pred_class  == "homic" & ano %in% year) |> droplevels() |>
-  count(ano, uf_resd,codmunres,.pred_class, name = "homic_ocult") |> select(!c(.pred_class)) |>
+  filter(.pred_class  == "homic" & ano %in% year) |> 
+  count(ano, def_uf_resd,codmunresd,.pred_class, name = "homic_ocult") |> select(!c(.pred_class)) |>
   mutate(ano = ano |> as.character() |> as.integer(), 
          #No microdado do SIM. A partir de 2006 o código do município aparece com 6. 
          #Vou deixar todos os municípios em todos os anos com 6 dígitos.
-         codmunres = substr(codmunres,1,6)) |> as_tibble() -> homic_ocult
+         codmunresd = substr(codmunresd,1,6)) -> homic_ocult
 
 #Join de homicídios registrados e homicídios ocultos a base de municípios da saúde.
 list(base_munics, homic_regis, homic_ocult) %>% 
-  reduce(full_join, by = join_by ("cod_ibge" == "codmunres","uf_resd","ano") ) |> 
+  reduce(full_join, by = join_by ("cod_ibge" == "codmunresd","def_uf_resd","ano") ) |> 
   #Os valores são missing, pois não houve ocorrência de homic registrado ou oculto nesse ano no município.
   mutate(across ( where(is.numeric),~replace_na(.,0) ),
          #Homicídio estimado
          homic_proj = homic_reg + homic_ocult) |>
  #Estou considerando contagem de homicídio no munci de residência. VOu renomear para deixar como munic de residência
- rename(codmunres = cod_ibge) -> homic_munic
+ rename(codmunresd = cod_ibge) -> homic_munic
 rm(base_munics,homic_ocult,homic_regis)
 
 #Importando população
@@ -99,7 +105,7 @@ pop <-  readr::read_delim("D:/Dropbox/Ipea/Atlas/Atlas Munic 2025/bases/Pop/pop_
 
 #Join da base de homicídios nos municípios com a população residente
 left_join(x = homic_munic, y = pop |> select(!c(munic)), 
-          by = join_by("codmunres" == "cod_ibge", "ano" ) ) -> homic_munic
+          by = join_by("codmunresd" == "cod_ibge", "ano" ) ) -> homic_munic
 rm(pop)
   
 #Check de NAs
@@ -112,7 +118,7 @@ homic_munic <-
   homic_munic %>%
   mutate(
   #Adicionando Capital.
-  cap_resd = case_when(codmunres %in% c(120040, 270430, 160030, 130260, 292740, 	230440,
+  cap_resd = case_when(codmunresd %in% c(120040, 270430, 160030, 130260, 292740, 	230440,
                                                530010, 320530, 520870, 211130, 510340, 	500270,
                                                310620, 150140, 250750, 410690, 261160, 
                                                221100, 330455, 240810, 431490, 110020, 140010,
@@ -130,7 +136,7 @@ homic_munic |>
   filter(pop >= 100000) |> 
   mutate(across(where(is.numeric) & !c(pop), ~ round((./pop)*100000,1), .names = "tx_{col}" ) ) |> 
   #Ordenando a tabela 
-  select(UF = uf_resd, "Município" =  munic_resd, ano, "População" = pop, "Homicídios registrados" = homic_reg,
+  select(UF = def_uf_resd, "Município" =  munic_resd, ano, "População" = pop, "Homicídios registrados" = homic_reg,
         "Homicídios ocultos" = homic_ocult, "Taxa de Homicídios Projetados" =  tx_homic_proj) |>
   #Ordem alfabética
   arrange(UF) |> rio::export(x=_,"Homic_oculto_munics100k.xlsx")
@@ -144,7 +150,7 @@ readxl::read_excel("D:/Dropbox/Ipea/Atlas/Atlas Munic 2025/bases/homic_munics.xl
 #Proporção acumulada de municípios e homicídios por ano
 
     #Mantém variáveis utilizadas
-    select(ano,codmunres,munic_resd,homic_proj) |>
+    select(ano,codmunresd,munic_resd,homic_proj) |>
     
     group_by(ano) %>%
     #Ordenando municípios mais violentos, por ano.
@@ -250,17 +256,17 @@ library(janitor)
   #Mantém somente as capitais
   filter(cap_resd == 1) |>
   #Mantém variáveis de interesse. 
-  select(ano,uf_resd,munic_resd,homic_proj) |>
+  select(ano,def_uf_resd,munic_resd,homic_proj) |>
   #Acrescentar região de residência
   mutate(reg_resd = case_when(
   #Região Norte
-  uf_resd %in% c("Acre","Amapá","Amazonas","Pará","Rondônia","Roraima", "Tocantins") ~ "Norte",
+  def_uf_resd %in% c("Acre","Amapá","Amazonas","Pará","Rondônia","Roraima", "Tocantins") ~ "Norte",
   #Região Nordeste
-  uf_resd %in% c("Alagoas","Bahia","Ceará","Maranhão","Paraíba","Pernambuco","Piauí","Rio Grande do Norte","Sergipe") ~ "Nordeste",
+  def_uf_resd %in% c("Alagoas","Bahia","Ceará","Maranhão","Paraíba","Pernambuco","Piauí","Rio Grande do Norte","Sergipe") ~ "Nordeste",
   #Região Centro-Oeste
-  uf_resd %in% c("Goiás","Mato Grosso", "Mato Grosso do Sul","Distrito Federal") ~ "Centro Oeste",
+  def_uf_resd %in% c("Goiás","Mato Grosso", "Mato Grosso do Sul","Distrito Federal") ~ "Centro Oeste",
   #Região Sudeste
-  uf_resd %in% c("Rio de Janeiro","São Paulo","Espírito Santo","Minas Gerais") ~ "Sudeste", 
+  def_uf_resd %in% c("Rio de Janeiro","São Paulo","Espírito Santo","Minas Gerais") ~ "Sudeste", 
   .default = "Sul") |> as_factor() ) |>
   #Formato wider
   pivot_wider(names_from = ano, values_from = homic_proj) |>
@@ -346,17 +352,17 @@ readxl::read_excel("D:/Dropbox/Ipea/Atlas/Atlas Munic 2025/bases/homic_munics.xl
   #Acrescentar região de residência
   mutate(reg_resd = case_when(
   #Região Norte
-  uf_resd %in% c("Acre","Amapá","Amazonas","Pará","Rondônia","Roraima", "Tocantins") ~ "Norte",
+  def_uf_resd %in% c("Acre","Amapá","Amazonas","Pará","Rondônia","Roraima", "Tocantins") ~ "Norte",
   #Região Nordeste
-  uf_resd %in% c("Alagoas","Bahia","Ceará","Maranhão","Paraíba","Pernambuco","Piauí","Rio Grande do Norte","Sergipe") ~ "Nordeste",
+  def_uf_resd %in% c("Alagoas","Bahia","Ceará","Maranhão","Paraíba","Pernambuco","Piauí","Rio Grande do Norte","Sergipe") ~ "Nordeste",
   #Região Centro-Oeste
-  uf_resd %in% c("Goiás","Mato Grosso", "Mato Grosso do Sul","Distrito Federal") ~ "Centro Oeste",
+  def_uf_resd %in% c("Goiás","Mato Grosso", "Mato Grosso do Sul","Distrito Federal") ~ "Centro Oeste",
   #Região Sudeste
-  uf_resd %in% c("Rio de Janeiro","São Paulo","Espírito Santo","Minas Gerais") ~ "Sudeste", 
+  def_uf_resd %in% c("Rio de Janeiro","São Paulo","Espírito Santo","Minas Gerais") ~ "Sudeste", 
   .default = "Sul") |> as_factor(),
   n  = row_number() ) |>
   #Mantém Variáveis de interesse
-  select(n, munic_resd, uf_resd, reg_resd, pop, homic_reg, homic_ocult, homic_proj, tx_homic_proj) |>
+  select(n, munic_resd, def_uf_resd, reg_resd, pop, homic_reg, homic_ocult, homic_proj, tx_homic_proj) |>
   #Exportando
   rio::export(x = _, "homic_munic100k.xlsx")
 
@@ -376,17 +382,17 @@ readxl::read_excel("D:/Dropbox/Ipea/Atlas/Atlas Munic 2025/bases/homic_munics.xl
   #Acrescentar região de residência
   mutate(reg_resd = case_when(
     #Região Norte
-    uf_resd %in% c("Acre","Amapá","Amazonas","Pará","Rondônia","Roraima", "Tocantins") ~ "Norte",
+    def_uf_resd %in% c("Acre","Amapá","Amazonas","Pará","Rondônia","Roraima", "Tocantins") ~ "Norte",
     #Região Nordeste
-    uf_resd %in% c("Alagoas","Bahia","Ceará","Maranhão","Paraíba","Pernambuco","Piauí","Rio Grande do Norte","Sergipe") ~ "Nordeste",
+    def_uf_resd %in% c("Alagoas","Bahia","Ceará","Maranhão","Paraíba","Pernambuco","Piauí","Rio Grande do Norte","Sergipe") ~ "Nordeste",
     #Região Centro-Oeste
-    uf_resd %in% c("Goiás","Mato Grosso", "Mato Grosso do Sul","Distrito Federal") ~ "Centro Oeste",
+    def_uf_resd %in% c("Goiás","Mato Grosso", "Mato Grosso do Sul","Distrito Federal") ~ "Centro Oeste",
     #Região Sudeste
-    uf_resd %in% c("Rio de Janeiro","São Paulo","Espírito Santo","Minas Gerais") ~ "Sudeste", 
+    def_uf_resd %in% c("Rio de Janeiro","São Paulo","Espírito Santo","Minas Gerais") ~ "Sudeste", 
     .default = "Sul") |> as_factor(),
     n  = row_number() ) |>
   #Mantém Variáveis de interesse
-  select(n, munic_resd, uf_resd, reg_resd, pop, homic_reg, homic_ocult, homic_proj, tx_homic_proj) |>
+  select(n, munic_resd, def_uf_resd, reg_resd, pop, homic_reg, homic_ocult, homic_proj, tx_homic_proj) |>
   #Exportando
   rio::export(x = _, "homic_munic_capital.xlsx")
  
@@ -400,22 +406,22 @@ readxl::read_excel("D:/Dropbox/Ipea/Atlas/Atlas Munic 2025/bases/homic_munics.xl
   #Mantém somente capitais
   filter(cap_resd == 1) |>
   #Seleciona Variáveis de interesse
-  select(ano,uf_resd,munic_resd,homic_proj) |>
+  select(ano,def_uf_resd,munic_resd,homic_proj) |>
   #Acrescentar região de residência
   mutate(reg_resd = case_when(
   #Região Norte
-  uf_resd %in% c("Acre","Amapá","Amazonas","Pará","Rondônia","Roraima", "Tocantins") ~ "Norte",
+  def_uf_resd %in% c("Acre","Amapá","Amazonas","Pará","Rondônia","Roraima", "Tocantins") ~ "Norte",
   #Região Nordeste
-  uf_resd %in% c("Alagoas","Bahia","Ceará","Maranhão","Paraíba","Pernambuco","Piauí","Rio Grande do Norte","Sergipe") ~ "Nordeste",
+  def_uf_resd %in% c("Alagoas","Bahia","Ceará","Maranhão","Paraíba","Pernambuco","Piauí","Rio Grande do Norte","Sergipe") ~ "Nordeste",
   #Região Centro-Oeste
-  uf_resd %in% c("Goiás","Mato Grosso", "Mato Grosso do Sul","Distrito Federal") ~ "Centro Oeste",
+  def_uf_resd %in% c("Goiás","Mato Grosso", "Mato Grosso do Sul","Distrito Federal") ~ "Centro Oeste",
   #Região Sudeste
-  uf_resd %in% c("Rio de Janeiro","São Paulo","Espírito Santo","Minas Gerais") ~ "Sudeste", 
+  def_uf_resd %in% c("Rio de Janeiro","São Paulo","Espírito Santo","Minas Gerais") ~ "Sudeste", 
   .default = "Sul") |> as_factor() ) |>
   #Formato wide
   pivot_wider(names_from = ano, values_from = homic_proj) |>
   #Ordenação das variáveis
-  dplyr::relocate(munic_resd, .before = uf_resd) |>
+  dplyr::relocate(munic_resd, .before = def_uf_resd) |>
   #Exportação
   rio::export(x = _, "tab3_n_homic_proj_capitais.xlsx")
 
@@ -430,22 +436,22 @@ readxl::read_excel("D:/Dropbox/Ipea/Atlas/Atlas Munic 2025/bases/homic_munics.xl
   #Mantém somente capitais
   filter(cap_resd == 1) |>
   #Seleciona Variáveis de interesse
-  select(ano,uf_resd,munic_resd,tx_homic_proj) |>
+  select(ano,def_uf_resd,munic_resd,tx_homic_proj) |>
   #Acrescentar região de residência
   mutate(reg_resd = case_when(
     #Região Norte
-    uf_resd %in% c("Acre","Amapá","Amazonas","Pará","Rondônia","Roraima", "Tocantins") ~ "Norte",
+    def_uf_resd %in% c("Acre","Amapá","Amazonas","Pará","Rondônia","Roraima", "Tocantins") ~ "Norte",
     #Região Nordeste
-    uf_resd %in% c("Alagoas","Bahia","Ceará","Maranhão","Paraíba","Pernambuco","Piauí","Rio Grande do Norte","Sergipe") ~ "Nordeste",
+    def_uf_resd %in% c("Alagoas","Bahia","Ceará","Maranhão","Paraíba","Pernambuco","Piauí","Rio Grande do Norte","Sergipe") ~ "Nordeste",
     #Região Centro-Oeste
-    uf_resd %in% c("Goiás","Mato Grosso", "Mato Grosso do Sul","Distrito Federal") ~ "Centro Oeste",
+    def_uf_resd %in% c("Goiás","Mato Grosso", "Mato Grosso do Sul","Distrito Federal") ~ "Centro Oeste",
     #Região Sudeste
-    uf_resd %in% c("Rio de Janeiro","São Paulo","Espírito Santo","Minas Gerais") ~ "Sudeste", 
+    def_uf_resd %in% c("Rio de Janeiro","São Paulo","Espírito Santo","Minas Gerais") ~ "Sudeste", 
     .default = "Sul") |> as_factor() ) |>
   #Formato wide
   pivot_wider(names_from = ano, values_from = tx_homic_proj) |>
   #Ordenação das variáveis
-  dplyr::relocate(munic_resd, .before = uf_resd) |>
+  dplyr::relocate(munic_resd, .before = def_uf_resd) |>
   #Exportação
   rio::export(x = _, "tab5_tx_homic_proj_capitais.xlsx")
 
@@ -465,27 +471,27 @@ reg <- c("Sul", "Sudeste", "Norte", "Nordeste", "Centro Oeste")
 p <-  readxl::read_excel("D:/Dropbox/Ipea/Atlas/Atlas Munic 2025/bases/taxa_homicidio_estimado_uf_br.xlsx",
                    skip = 1) |>
   #Mantém colunas de interesse.
-  select(uf_resd,2:12) |> 
+  select(def_uf_resd,2:12) |> 
   #Exlusão da linha Brasil   
-  filter(uf_resd!="Brasil") |>
+  filter(def_uf_resd!="Brasil") |>
   #Acrescentar região de residência
   mutate(reg_resd = case_when(
     #Região Norte
-    uf_resd %in% c("Acre","Amapá","Amazonas","Pará","Rondônia","Roraima", "Tocantins") ~ "Norte",
+    def_uf_resd %in% c("Acre","Amapá","Amazonas","Pará","Rondônia","Roraima", "Tocantins") ~ "Norte",
     #Região Nordeste
-    uf_resd %in% c("Alagoas","Bahia","Ceará","Maranhão","Paraíba","Pernambuco","Piauí","Rio Grande do Norte","Sergipe") ~ "Nordeste",
+    def_uf_resd %in% c("Alagoas","Bahia","Ceará","Maranhão","Paraíba","Pernambuco","Piauí","Rio Grande do Norte","Sergipe") ~ "Nordeste",
     #Região Centro-Oeste
-    uf_resd %in% c("Goiás","Mato Grosso", "Mato Grosso do Sul","Distrito Federal") ~ "Centro Oeste",
+    def_uf_resd %in% c("Goiás","Mato Grosso", "Mato Grosso do Sul","Distrito Federal") ~ "Centro Oeste",
     #Região Sudeste
-    uf_resd %in% c("Rio de Janeiro","São Paulo","Espírito Santo","Minas Gerais") ~ "Sudeste", 
+    def_uf_resd %in% c("Rio de Janeiro","São Paulo","Espírito Santo","Minas Gerais") ~ "Sudeste", 
     .default = "Sul") |> as_factor() ) |>
   #Formato wide
-  pivot_longer(cols = !c(uf_resd,reg_resd), names_to = "ano",
+  pivot_longer(cols = !c(def_uf_resd,reg_resd), names_to = "ano",
                values_to = "tx", names_transform =  list(ano = as.numeric) ) |> 
   # #Mantém região de interesse.
   filter(reg_resd == i) |> 
   # #Gráfico
-  ggplot( aes(x = ano, y = tx, color = uf_resd, linetype = uf_resd)  ) +
+  ggplot( aes(x = ano, y = tx, color = def_uf_resd, linetype = def_uf_resd)  ) +
   geom_line() + geom_point() +
   #scale_y_continuous(breaks = seq(20,90,5) ) +
   scale_x_continuous(breaks = seq(2013,2023,1) ) +
