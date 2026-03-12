@@ -10,7 +10,6 @@ load(paste0(dirname(getwd()),"/bases/homic_oculto/sim_doext_homic_pred_96_24.Rda
 year <- seq(2000, as.integer(format(Sys.Date(), "%Y")) - 2);gc()
 
 
-# Importando base com todos os municípios do país.  -----------------------
 #Importação base de municípíos e elaboração de painel de municípios
 base_munics <- 
   readxl::read_excel(paste0(dirname(getwd()),"/bases/Bases Gerais/munics.xlsx")) |>
@@ -110,12 +109,15 @@ homic_munic |>
 # Homicídios acumulados por município -------------------------------------------
 library(tidyverse)
 
+#Pasta Raiz
+here::i_am("Rotinas/Oculto/Atlas dos Municípios 2026.R")
 #Importando base dos homicídios no município de residência
-readxl::read_excel("D:/Dropbox/Ipea/Atlas/Atlas Munic 2025/bases/homic_munics.xlsx") |>
+readxl::read_excel(here::here("base","oculto","munic","homic_munics.xlsx") ) |>
+  rename(def_munic_resd = name_muni) |>
+  
 #Proporção acumulada de municípios e homicídios por ano
-
     #Mantém variáveis utilizadas
-    select(ano,codmunresd,munic_resd,homic_proj) |>
+    select(ano,codmunresd,def_munic_resd,homic_proj) |>
     
     group_by(ano) %>%
     #Ordenando municípios mais violentos, por ano.
@@ -133,55 +135,79 @@ readxl::read_excel("D:/Dropbox/Ipea/Atlas/Atlas Munic 2025/bases/homic_munics.xl
   
 #Gráfico da Curva de Lorenz por ano
 base |>  
-    #Mantém somente 10% dos municípios
-    filter(prop_municipios <= 0.10 & ano %in% c(2013, 2015, 2017, 2019, 2021, 2023)) |>
   
-    ggplot( aes(x = prop_municipios, y = prop_homic_acumulada, color = factor(ano))) +
-    geom_line(linewidth = 0.7, alpha = 0.8) +
+    #Mantém somente 10% dos municípios
+    filter(prop_municipios <= 0.10 & 
+    #Sequência bianual dos últimos dez anos         
+    ano %in% seq(as.integer( format(Sys.Date(), "%Y") ) -12 ,    as.integer(format(Sys.Date(), "%Y")) - 2, 2)  ) |>
+    #Gráfico
+    ggplot() +
+  
+    geom_hline(yintercept = 0.5, linetype="dashed", 
+               color = "red", linewidth = 0.5) +
+  
+    geom_line(aes(x = prop_municipios, y = prop_homic_acumulada, color = factor(ano)),
+              linewidth = 0.7, alpha = 0.8) +
+  
     #geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "gray50") +  # Linha de igualdade
+  
     scale_x_continuous(labels = scales::percent, breaks = seq(0,0.1, by = 0.005)) +
-    scale_y_continuous(labels = scales::percent, breaks = seq(0, 0.8, by = 0.05)) +
+  
+    scale_y_continuous(labels = scales::percent, breaks = seq(0, 0.9, by = 0.05)) +
+  
     labs(
       #title = "Curva de Lorenz: Desigualdade na Distribuição de Homicídios por Município (2013-2023)",
       x = "Proporção Acumulada de Municípios (Ordenados por Homicídios)",
-      y = "Proporção Acumulada de Homicídios",
+      y = "Proporção Acumulada de Homicídios", 
       color = "" ) +
+  
   theme( legend.background = element_rect(fill = "transparent", color = NA),  # Fundo transparente
          legend.key = element_rect(fill = "transparent", color = NA),         # Área dos símbolos tra
       legend.position = "bottom",
       panel.grid.minor = element_blank() ) +
+  
     guides(color = guide_legend(nrow = 1, override.aes = list(alpha = 1) ) )
-ggsave(filename ="Curva de Lorenz.bmp",width = 9,height = 6,device='bmp', dpi=160)
-ggsave(filename ="Curva de Lorenz.eps",width = 9,height = 6,device=cairo_ps, dpi=160)
+ggsave(filename ="base/munic/figuras/Curva de Lorenz.bmp",width = 9,height = 6,device='bmp', dpi=160)
+ggsave(filename ="base/munic/figuras/Curva de Lorenz.eps",width = 9,height = 6,device=cairo_ps, dpi=160)
 
   
 base |>  
   #Mantém somente 10% dos municípios
-  filter(prop_municipios <= 0.10 & ano %in% c(2013, 2015, 2017, 2019, 2021, 2023)) |>
-  rio::export(x = _, "curva_lorenz.xlsx")
+  filter(prop_municipios <= 0.10 & 
+  #Sequência bianual dos últimos dez anos         
+  ano %in% seq(as.integer( format(Sys.Date(), "%Y") ) -12 ,  as.integer(format(Sys.Date(), "%Y")) - 2, 2) ) |>
+  rio::export(x = _, "base/munic/base/curva_lorenz.xlsx")
 
 
 # GR.1 - Capitais brasileiras Barras ---------------------------------------------
 library(tidyverse)
 library(janitor)
-readxl::read_excel("D:/Dropbox/Ipea/Atlas/Atlas Munic 2025/bases/homic_munics.xlsx") |>
-  #Período utilizado
-  filter(ano == 2023) |>
+
+#Pasta Raiz
+here::i_am("Rotinas/Oculto/Atlas dos Municípios 2026.R")
+#Importando base dos homicídios no município de residência
+readxl::read_excel(here::here("base","oculto","munic","homic_munics.xlsx") ) |>
+  #Último ano disponível
+  filter(ano == as.integer(format(Sys.Date(), "%Y")) - 2 ) |>
   #Mantém variáveis de interesse. Necessário para criar o total Brasil
-  select(ano,munic_resd,pop,homic_reg,homic_ocult,homic_proj,cap_resd) %>%
+  select(ano, munic_resd = name_muni  ,pop ,homic_reg,homic_ocult,homic_proj,cap_resd) %>% 
   
   bind_rows(. |>
               summarise(munic_resd="Brasil" |> as.factor(),
                         pop = sum(pop, na.rm = TRUE), #Retirar população de municípios missing.
                         homic_reg = sum(homic_reg),
                         homic_ocult = sum(homic_ocult),
-                        homic_proj = sum(homic_proj), .by=ano) )  |>
+                        homic_proj = sum(homic_proj), .by=ano) ) |> 
+  
   #Mantém Brasil e Capitais
   filter(munic_resd == "Brasil" | cap_resd == 1) |>
+  
   #Exclusão das variáveis ano e capitais
   select(!c(ano,cap_resd) )  |>
+  
   #Criando taxas de interesse.
   mutate(across(where(is.numeric) & !c(pop), ~ round((./pop)*100000,1), .names = "tx_{col}" ) )  |>
+  
   #Mantém variáveis de interesse
   select(munic_resd,tx_homic_reg, tx_homic_ocult, tx_homic_proj) |>
   #Formato long
@@ -189,7 +215,9 @@ readxl::read_excel("D:/Dropbox/Ipea/Atlas/Atlas Munic 2025/bases/homic_munics.xl
              names_to = "variable", values_to = "cases")  |>
   #Ordenando o Gráfico.
   mutate(munic_resd = fct_reorder(munic_resd,tx_homic_proj) ) |>
+  #Gráfico
   ggplot() +
+  
   geom_col(aes(x=cases,y=munic_resd,fill=variable),
            position = position_stack(reverse = F)) +
   geom_text(data = . %>% filter(variable == "tx_homic_reg"),
@@ -206,8 +234,8 @@ readxl::read_excel("D:/Dropbox/Ipea/Atlas/Atlas Munic 2025/bases/homic_munics.xl
         legend.direction = c("horizontal"),axis.text = element_text(size = 8),
         legend.background = element_rect(fill = "transparent", colour = NA))
 
-ggsave(filename ="GR1.bmp",width = 9,height = 6,device='bmp', dpi=160)
-ggsave(filename ="GR1.eps",width = 9,height = 6,device=cairo_ps, dpi=160)
+ggsave(filename ="base/munic/figuras/GR1.bmp",width = 9,height = 6,device='bmp', dpi=160)
+ggsave(filename ="base/munic/figuras/GR1.eps",width = 9,height = 6,device=cairo_ps, dpi=160)
 
 
 
@@ -215,13 +243,14 @@ ggsave(filename ="GR1.eps",width = 9,height = 6,device=cairo_ps, dpi=160)
 library(tidyverse)
 library(janitor)
 
-  
-  
-  readxl::read_excel("D:/Dropbox/Ipea/Atlas/Atlas Munic 2025/bases/homic_munics.xlsx") |>
+#Pasta Raiz
+here::i_am("Rotinas/Oculto/Atlas dos Municípios 2026.R")
+#Importando base dos homicídios no município de residência
+readxl::read_excel(here::here("base","oculto","munic","homic_munics.xlsx") ) |>
   #Mantém somente as capitais
   filter(cap_resd == 1) |>
   #Mantém variáveis de interesse. 
-  select(ano,def_uf_resd,munic_resd,homic_proj) |>
+  select(ano, def_uf_resd, munic_resd = name_muni, homic_proj)  |>
   #Acrescentar região de residência
   mutate(reg_resd = case_when(
   #Região Norte
@@ -235,44 +264,33 @@ library(janitor)
   .default = "Sul") |> as_factor() ) |>
   #Formato wider
   pivot_wider(names_from = ano, values_from = homic_proj) |>
-  rio::export(x = _, "n_homic_proj_cap.xlsx")
-  
 
-
-
-
-
-#Tabela
-base |>
-  
-  
-
-  
-  
-  #Colocar regiões
-  rio::export(x = _, "n_homic_proj_cap.xlsx")
-
-
+  rio::export(x = _, "base/munic/base/n_homic_proj_cap.xlsx")
 
 
 # Tabela 1 Taxa por tamanho da população ----------------------------------------------------------------
 library(tidyverse)
 library(janitor)
-year <- 2023
 
-#Importando base
-readxl::read_excel("D:/Dropbox/Ipea/Atlas/Atlas Munic 2025/bases/homic_munics.xlsx") |>
+#Pasta Raiz
+here::i_am("Rotinas/Oculto/Atlas dos Municípios 2026.R")
+#Último ano disponível
+year <- as.integer(format(Sys.Date(), "%Y")) - 2
+
+#Importando base dos homicídios no município de residência
+readxl::read_excel(here::here("base","oculto","munic","homic_munics.xlsx") ) |>
   #Mantém ano de interesse
   filter(ano == year) |>
   #Mantém variáveis de interesse.
-  select(munic_resd,pop,tx_homic_proj) |>
+  select(munic_resd = name_muni , pop, tx_homic_proj) |>
   #Municípios por tamanho da população
-  mutate(g_munic = case_when(pop <= 100000 ~ "Pequeno",
+  mutate(g_munic = case_when(pop <= 100000 ~ "Pequeno", #Inferior a 100k
                              pop > 100000 & pop <= 500000 ~ "Médio",
-                             pop > 500000 ~ "Grande", .default = "Município ignorado" ) ) |>
+                             pop > 500000 ~ "Grande", 
+                             .default = "Município ignorado" ) ) |>
   filter(g_munic != "Município ignorado") |> 
   #Tabela considerando o agrupamento por municípios.
-  summarise(quantidade = n(),
+  summarise(quantidade = n(), #Quantidade de municípios
             média = mean(tx_homic_proj),
             mediana = median(tx_homic_proj),
             dp = sd(tx_homic_proj),
@@ -280,11 +298,15 @@ readxl::read_excel("D:/Dropbox/Ipea/Atlas/Atlas Munic 2025/bases/homic_munics.xl
             máximo = max(tx_homic_proj), .by = g_munic) -> tab1
   
 
-readxl::read_excel("D:/Dropbox/Ipea/Atlas/Atlas Munic 2025/bases/homic_munics.xlsx") |>
+readxl::read_excel(here::here("base","oculto","munic","homic_munics.xlsx") ) |>
+  rename(munic_resd = name_muni) |>
   #Mantém ano de interesse e exclusão de municípios ignorados e exterior.
   filter(ano == year & !str_detect(munic_resd, "ignorado|exterior") ) |> 
   #Mantém variáveis de interesse.
   select(munic_resd,pop,tx_homic_proj) |>
+  
+  filter_out(is.na(tx_homic_proj)) |> 
+  
   #Tabela considerando o agrupamento por municípios.
   summarise(g_munic = "Todos",
             quantidade = n(),
@@ -297,7 +319,7 @@ readxl::read_excel("D:/Dropbox/Ipea/Atlas/Atlas Munic 2025/bases/homic_munics.xl
 bind_rows(tab1, tab2) |>
   rename(Grupo = g_munic) |>
   #Exportando
-  rio::export(x = _, "tab1_grupos_munics.xlsx")
+  rio::export(x = _, "base/munic/base/tab1_grupos_munics.xlsx")
 rm(tab1,tab2) 
  
 
