@@ -328,10 +328,14 @@ rm(tab1,tab2)
 # Tab 2 - homicídios estimados, pop > 100k --------------------------------
 library(tidyverse)
 library(janitor)
-year <- 2023
+#Pasta Raiz
+here::i_am("Rotinas/Oculto/Atlas dos Municípios 2026.R")
+#Último ano disponível
+year <- as.integer(format(Sys.Date(), "%Y")) - 2
 
-#Importando base
-readxl::read_excel("D:/Dropbox/Ipea/Atlas/Atlas Munic 2025/bases/homic_munics.xlsx") |> 
+#Importando base dos homicídios no município de residência
+readxl::read_excel(here::here("base","oculto","munic","homic_munics.xlsx") ) |>
+  rename(munic_resd = name_muni) |>
   #Mantém ano de interesse e exclusão de municípios ignorados e exterior.
   filter(ano == year & !str_detect(munic_resd, "ignorado|exterior") & pop >= 100000  )  |>
   #Ordenação decrescenta na taxa estimada
@@ -349,19 +353,23 @@ readxl::read_excel("D:/Dropbox/Ipea/Atlas/Atlas Munic 2025/bases/homic_munics.xl
   .default = "Sul") |> as_factor(),
   n  = row_number() ) |>
   #Mantém Variáveis de interesse
-  select(n, munic_resd, def_uf_resd, reg_resd, pop, homic_reg, homic_ocult, homic_proj, tx_homic_proj) |>
+  select(n, munic_resd, def_uf_resd, reg_resd, pop, homic_reg, homic_ocult, homic_proj, tx_homic_proj) |>  
   #Exportando
-  rio::export(x = _, "homic_munic100k.xlsx")
+  rio::export(x = _, "base/munic/base/homic_munic100k.xlsx")
 
 
 
 # Tab 3 - Homicído estimado capitais --------------------------------------
 library(tidyverse)
 library(janitor)
-year <- 2023
 
-#Importando base
-readxl::read_excel("D:/Dropbox/Ipea/Atlas/Atlas Munic 2025/bases/homic_munics.xlsx") |> 
+#Pasta Raiz
+here::i_am("Rotinas/Oculto/Atlas dos Municípios 2026.R")
+#Último ano disponível
+year <- as.integer(format(Sys.Date(), "%Y")) - 2
+
+#Importando base dos homicídios no município de residência
+readxl::read_excel(here::here("base","oculto","munic","homic_munics.xlsx") ) |> 
   #Mantém ano de interesse e capitais
   filter(ano == year & cap_resd == 1) |>
   #Ordenação decrescenta na taxa estimada
@@ -379,21 +387,26 @@ readxl::read_excel("D:/Dropbox/Ipea/Atlas/Atlas Munic 2025/bases/homic_munics.xl
     .default = "Sul") |> as_factor(),
     n  = row_number() ) |>
   #Mantém Variáveis de interesse
-  select(n, munic_resd, def_uf_resd, reg_resd, pop, homic_reg, homic_ocult, homic_proj, tx_homic_proj) |>
+  select(n, munic_resd = name_muni, def_uf_resd, reg_resd, pop, homic_reg, homic_ocult, homic_proj, tx_homic_proj)  |>
   #Exportando
-  rio::export(x = _, "homic_munic_capital.xlsx")
+  rio::export(x = _, "base/munic/base/homic_munic_capital.xlsx")
  
 
 # Tab 4 - Homicídios estimados nas capitais brasileiras -------------------
 library(tidyverse)
 library(janitor)
 
-#Importando base
-readxl::read_excel("D:/Dropbox/Ipea/Atlas/Atlas Munic 2025/bases/homic_munics.xlsx") |> 
+#Pasta Raiz
+here::i_am("Rotinas/Oculto/Atlas dos Municípios 2026.R")
+#Último ano disponível
+year <- as.integer(format(Sys.Date(), "%Y")) - 2
+
+#Importando base dos homicídios no município de residência
+readxl::read_excel(here::here("base","oculto","munic","homic_munics.xlsx") )  |>
   #Mantém somente capitais
   filter(cap_resd == 1) |>
   #Seleciona Variáveis de interesse
-  select(ano,def_uf_resd,munic_resd,homic_proj) |>
+  select(ano,def_uf_resd,munic_resd = name_muni,homic_proj) |>
   #Acrescentar região de residência
   mutate(reg_resd = case_when(
   #Região Norte
@@ -406,11 +419,11 @@ readxl::read_excel("D:/Dropbox/Ipea/Atlas/Atlas Munic 2025/bases/homic_munics.xl
   def_uf_resd %in% c("Rio de Janeiro","São Paulo","Espírito Santo","Minas Gerais") ~ "Sudeste", 
   .default = "Sul") |> as_factor() ) |>
   #Formato wide
-  pivot_wider(names_from = ano, values_from = homic_proj) |>
+  pivot_wider(names_from = ano, values_from = homic_proj)  |>
   #Ordenação das variáveis
   dplyr::relocate(munic_resd, .before = def_uf_resd) |>
   #Exportação
-  rio::export(x = _, "tab3_n_homic_proj_capitais.xlsx")
+  rio::export(x = _, "base/munic/base/tab3_n_homic_proj_capitais.xlsx")
 
 
 
@@ -418,12 +431,17 @@ readxl::read_excel("D:/Dropbox/Ipea/Atlas/Atlas Munic 2025/bases/homic_munics.xl
 library(tidyverse)
 library(janitor)
 
-#Importando base
-readxl::read_excel("D:/Dropbox/Ipea/Atlas/Atlas Munic 2025/bases/homic_munics.xlsx") |> 
+#Pasta Raiz
+here::i_am("Rotinas/Oculto/Atlas dos Municípios 2026.R")
+#Último ano disponível
+year <- as.integer(format(Sys.Date(), "%Y")) - 2
+
+#Importando base dos homicídios no município de residência
+readxl::read_excel(here::here("base","oculto","munic","homic_munics.xlsx") )  |> 
   #Mantém somente capitais
   filter(cap_resd == 1) |>
   #Seleciona Variáveis de interesse
-  select(ano,def_uf_resd,munic_resd,tx_homic_proj) |>
+  select(ano,def_uf_resd,munic_resd = name_muni,tx_homic_proj) |>
   #Acrescentar região de residência
   mutate(reg_resd = case_when(
     #Região Norte
@@ -438,15 +456,18 @@ readxl::read_excel("D:/Dropbox/Ipea/Atlas/Atlas Munic 2025/bases/homic_munics.xl
   #Formato wide
   pivot_wider(names_from = ano, values_from = tx_homic_proj) |>
   #Ordenação das variáveis
-  dplyr::relocate(munic_resd, .before = def_uf_resd) |>
+  dplyr::relocate(munic_resd, .before = def_uf_resd)  |>
   #Exportação
-  rio::export(x = _, "tab5_tx_homic_proj_capitais.xlsx")
+  rio::export(x = _, "base/munic/base/tab5_tx_homic_proj_capitais.xlsx")
 
 
 
 # Gr4 - Tx. Estimada Regiões ---------------------------------------------
 library(tidyverse)
 library(janitor)
+
+#Pasta Raiz
+here::i_am("Rotinas/Oculto/Atlas dos Municípios 2026.R")
 #Fazer loop alterando a regiãode interesse.
 
 
@@ -455,8 +476,8 @@ reg <- c("Sul", "Sudeste", "Norte", "Nordeste", "Centro Oeste")
  for (i in reg) {
   # nome_arquivo <- paste0("tx_proj_",tolower(sub("\\.", "_", i)), ".bmp")
   #Importando base
-p <-  readxl::read_excel("D:/Dropbox/Ipea/Atlas/Atlas Munic 2025/bases/taxa_homicidio_estimado_uf_br.xlsx",
-                   skip = 1) |>
+p <-  readxl::read_excel(here::here("base","oculto","base","tx_homicidio_estimado_uf_br.xlsx"), 
+                         sheet = "Plan1" )  |>
   #Mantém colunas de interesse.
   select(def_uf_resd,2:12) |> 
   #Exlusão da linha Brasil   
@@ -478,10 +499,10 @@ p <-  readxl::read_excel("D:/Dropbox/Ipea/Atlas/Atlas Munic 2025/bases/taxa_homi
   # #Mantém região de interesse.
   filter(reg_resd == i) |> 
   # #Gráfico
-  ggplot( aes(x = ano, y = tx, color = def_uf_resd, linetype = def_uf_resd)  ) +
+  ggplot( aes(x = ano, y = tx, group = def_uf_resd, color = def_uf_resd, linetype = def_uf_resd)  ) +
   geom_line() + geom_point() +
   #scale_y_continuous(breaks = seq(20,90,5) ) +
-  scale_x_continuous(breaks = seq(2013,2023,1) ) +
+  #scale_x_continuous(breaks = seq(2013,2023,1) ) +
   labs(x = "", y = "Tx. Homicídio Estimado", color = "", linetype = "") +
   theme(axis.title.y = element_text(size = 8),
         axis.text.y = element_text(face = "bold"), axis.text.x = element_text(face="bold"),
