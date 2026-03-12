@@ -6,63 +6,18 @@ library(janitor)
 here::i_am("Rotinas/Oculto/Atlas dos Municípios 2026.R")
 #Importação base de interesse
 load(paste0(dirname(getwd()),"/bases/homic_oculto/sim_doext_homic_pred_96_24.Rdata"))
-year <- seq(as.integer(format(Sys.Date(), "%Y")) - 12, as.integer(format(Sys.Date(), "%Y")) - 2);gc()
+#Todos os anos, até o último ano disponível
+year <- seq(2000, as.integer(format(Sys.Date(), "%Y")) - 2);gc()
 
 
 # Importando base com todos os municípios do país.  -----------------------
-#Fonte: https://www.ibge.gov.br/explica/codigos-dos-municipios.php
-# base_munics <- readxl::read_excel("D:/Dropbox/Ipea/Atlas/municipios_br.xls",sheet = "munics") |>
-#   select("Nome_UF", "Código Município Completo","Nome_Município") |> clean_names() |>
-#   rename(cod_ibge = "codigo_municipio_completo", munic_resd = nome_municipio,def_uf_resd = nome_uf) |>
-#   #No microdado do SIM. A partir de 2006 o código do município aparece com 6. 
-#   #Vou deixar todos os municípios em todos os anos com 6 dígitos.
-#   mutate(cod_ibge = substr(cod_ibge,1,6)) 
-# 
-# #Adicionando município Ignorado ou exterior. 
-# #A saúde utiliza código de município ingorado. Esses municípios não aparecem em outras bases.
-# munics_ign <- tribble(~cod_ibge,~munic_resd, ~def_uf_resd,
-#                       "000000", "Ignorado ou exterior", "Ignorado ou exterior",
-#                       "110000", "Município ignorado - RO", "Rondônia",
-#                       "130000", "Município ignorado - AM", "Amazonas", 
-#                       "150000", "Município ignorado - PA", "Pará", 
-#                       "210000", "Município ignorado - MA", "Maranhão",
-#                       "170000", "Município ignorado - TO", "Tocantins",
-#                       "240000", "Município ignorado - RN", "Rio Grande do Norte",
-#                       "260000" ,"Município ignorado - PE", "Pernambuco",
-#                       "280000", "Município ignorado - SE", "Sergipe",
-#                       "310000", "Município ignorado - MG", "Minas Gerais",
-#                       "330000", "Município ignorado - RJ", "Rio de Janeiro",
-#                       "410000", "Município ignorado - PR", "Paraná",
-#                       "430000", "Município ignorado - RS", "Rio Grande do Sul",
-#                       "510000", "Município ignorado - MT", "Mato Grosso",
-#                       "520000", "Município ignorado - GO", "Goiás",
-#                       "120000", "Município ignorado - AC", "Acre",        
-#                       "140000", "Município ignorado - RR", "Roraima",
-#                       "160000", "Município ignorado - AP", "Amapá",  
-#                       "220000", "Município ignorado - PI", "Piauí",
-#                       "230000", "Município ignorado - CE", "Ceará",  
-#                       "250000", "Município ignorado - PB", "Paraíba",
-#                       "270000", "Município ignorado - AL", "Alagoas",
-#                       "290000", "Município ignorado - BA", "Bahia",
-#                       "320000", "Município ignorado - ES", "Espírito Santo",
-#                       "350000", "Município ignorado - SP", "São Paulo",
-#                       "420000", "Município ignorado - SC", "Santa Catarina",
-#                       "500000", "Município ignorado - MS",  "Mato Grosso do Sul")
-# 
-# #Não estão incluídios os municípios que são bairros presentes no início da série.
-# #Por exemplo, Rio de Janeiro.
-# 
-# #Bind de municípios conhecidos e ignorados.
-# bind_rows(base_munics,munics_ign) -> base_munics
-# rm(munics_ign)
-# 
-
 #Importação base de municípíos e elaboração de painel de municípios
-base_munics <- readxl::read_excel("G:/gab_lins/Projetos/bases/Bases Gerais/munics.xlsx") |>
+base_munics <- 
+  readxl::read_excel(paste0(dirname(getwd()),"/bases/Bases Gerais/munics.xlsx")) |>
   #Painel de municípios
   expand_grid(ano = year) |>
-  rename(cod_ibge = code_muni,
-         def_uf_resd = name_state)
+  #Rename para permitir o join
+  rename(cod_ibge = code_muni, def_uf_resd = name_state)
   
 #Contagem de homicídios registrados em cada município de residência. 
 sim_doext |> 
@@ -75,10 +30,10 @@ sim_doext |>
          codmunresd = substr(codmunresd,1,6) ) -> homic_regis
 
 #Contagem de homicídios OCULTOS em cada município
-homic_preds |> 
+homic_preds |>
   #Filtro das intenções de interesse.
-  filter(.pred_class  == "homic" & ano %in% year) |> 
-  count(ano, def_uf_resd,codmunresd,.pred_class, name = "homic_ocult") |> select(!c(.pred_class)) |>
+  filter(.pred_class %in% c("homic", "Homicídio") & ano %in% year) |> 
+  count(ano, def_uf_resd, codmunresd, .pred_class, name = "homic_ocult") |> select(!c(.pred_class)) |>
   mutate(ano = ano |> as.character() |> as.integer(), 
          #No microdado do SIM. A partir de 2006 o código do município aparece com 6. 
          #Vou deixar todos os municípios em todos os anos com 6 dígitos.
@@ -90,56 +45,66 @@ list(base_munics, homic_regis, homic_ocult) %>%
   #Os valores são missing, pois não houve ocorrência de homic registrado ou oculto nesse ano no município.
   mutate(across ( where(is.numeric),~replace_na(.,0) ),
          #Homicídio estimado
-         homic_proj = homic_reg + homic_ocult) |>
+         homic_proj = homic_reg + homic_ocult) |> 
  #Estou considerando contagem de homicídio no munci de residência. VOu renomear para deixar como munic de residência
  rename(codmunresd = cod_ibge) -> homic_munic
 rm(base_munics,homic_ocult,homic_regis)
 
+# #Importando população
+# pop <-  readr::read_delim("D:/Dropbox/Ipea/Atlas/Atlas Munic 2025/bases/Pop/pop_geral.csv", 
+#                          delim = ";", escape_double = FALSE, trim_ws = TRUE) |>
+#   #Formato longo
+#   pivot_longer(cols = !c(cod_ibge,munic), names_to = "ano", values_to = "pop", 
+#                names_transform = list(ano = as.integer  ) ) |>
+#   mutate(cod_ibge = cod_ibge |> as.character() )
+
+
 #Importando população
-pop <-  readr::read_delim("D:/Dropbox/Ipea/Atlas/Atlas Munic 2025/bases/Pop/pop_geral.csv", 
-                         delim = ";", escape_double = FALSE, trim_ws = TRUE) |>
-  #Formato longo
-  pivot_longer(cols = !c(cod_ibge,munic), names_to = "ano", values_to = "pop", 
-               names_transform = list(ano = as.integer  ) ) |>
-  mutate(cod_ibge = cod_ibge |> as.character() )
+load(paste0(dirname(getwd()),"/bases/populacao/ripsa/pop_ripsa.Rdata") )
+pop <- pop |> 
+  #População, por município e ano
+  summarise(pop = sum(pop), .by = c(ano,cod_mun) ) |>
+  #Código de municípios com seis dígitos
+  mutate(cod_mun = str_sub(as.character(cod_mun), end = -2),
+         ano = ano |> as.character() |> as.integer() )  
+
 
 #Join da base de homicídios nos municípios com a população residente
-left_join(x = homic_munic, y = pop |> select(!c(munic)), 
-          by = join_by("codmunresd" == "cod_ibge", "ano" ) ) -> homic_munic
+left_join(x = homic_munic, y = pop,  # |> select(!c(munic))
+          by = join_by("codmunresd" == "cod_mun", "ano" ) ) -> homic_munic
+  #Munic 510183 foi criado em 2023. Sua população começa a ser contabilizada em 2025.
 rm(pop)
   
 #Check de NAs
 homic_munic |>
   summarise(across(everything(), ~ mean(is.na(.)) ))
+#Munic 510183 foi criado em 2023. Sua população começa a ser contabilizada em 2025.
 #Missing em pop são os municípios ignorados
 
 #Tratamento da base de homicídios por município.
 homic_munic <- 
-  homic_munic %>%
+  homic_munic |>
   mutate(
   #Adicionando Capital.
-  cap_resd = case_when(codmunresd %in% c(120040, 270430, 160030, 130260, 292740, 	230440,
-                                               530010, 320530, 520870, 211130, 510340, 	500270,
-                                               310620, 150140, 250750, 410690, 261160, 
-                                               221100, 330455, 240810, 431490, 110020, 140010,
-                                               420540, 355030, 280030, 172100) ~ 1, .default = 0) )
-#Adicionar Regiões!!!
-
-
+  cap_resd = case_when(codmunresd %in% c(120040, 270430, 160030, 130260, 292740, 
+                                        230440,
+                                        530010, 320530, 520870, 211130, 510340, 	
+                                        500270,310620, 150140, 250750, 410690, 
+                                        261160, 221100, 330455, 240810, 431490,
+                                        110020, 140010, 420540, 355030, 280030, 
+                                        172100) ~ 1, .default = 0) ) 
 #Tabela atlas da violência
 homic_munic |>  
   mutate(across(where(is.numeric) & !c(ano,pop,cap_resd), ~ round((./pop)*100000,1), .names = "tx_{col}" ) ) |> 
-  rio::export(x=_,"homic_munics.xlsx")
+  rio::export(x=_,"base/oculto/munic/homic_munics.xlsx")
   
 #Mantém municípios com pop superior a 100k
 homic_munic |>  
   filter(pop >= 100000) |> 
-  mutate(across(where(is.numeric) & !c(pop), ~ round((./pop)*100000,1), .names = "tx_{col}" ) ) |> 
-  #Ordenando a tabela 
-  select(UF = def_uf_resd, "Município" =  munic_resd, ano, "População" = pop, "Homicídios registrados" = homic_reg,
-        "Homicídios ocultos" = homic_ocult, "Taxa de Homicídios Projetados" =  tx_homic_proj) |>
+  #Criação das taxas
+  mutate(across(starts_with("homic_"),  ~ round((./pop)*100000,1), .names = "tx_{col}" ) ) |>
   #Ordem alfabética
-  arrange(UF) |> rio::export(x=_,"Homic_oculto_munics100k.xlsx")
+  arrange(def_uf_resd) |> rio::export(x=_,"base/oculto/munic/Homic_oculto_munics100k.xlsx")
 
  
 # Homicídios acumulados por município -------------------------------------------
